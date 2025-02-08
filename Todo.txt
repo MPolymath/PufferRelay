@@ -1,8 +1,11 @@
 LDAP Convert the Following to Pyshark
-& 'C:\Program Files\Wireshark\tshark.exe' -T fields -e ip.src -e ip.dst -e ldap.name -e ldap.simple -O ldap -r network_capture.pcapng "ldap && ldap.protocolOp==bindRequest"
+& 'C:\Program Files\Wireshark\tshark.exe' -T fields -e ip.src -e ip.dst -e ldap.name -e ldap.simple -O ldap -r network_capture_ldap.pcapng "ldap && ldap.protocolOp==bindRequest"
 
 
 HTTP Convert the Following to Pyshark
-& 'C:\Program Files\Wireshark\tshark.exe' -T fields -e ip.src -e ip.dst -e ldap.name -e ldap.simple -O ldap -r network_capture.pcapng "http && http.request.method==POST"
+& 'C:\Program Files\Wireshark\tshark.exe' -T fields -e ip.src -e ip.dst -e http.host -e http.request.uri -e http.file_data -O http -r network_capture_http.pcapng "http && http.request.method==POST"
+
+FTP Convert the Following to Pyshark
+& 'C:\Program Files\Wireshark\tshark.exe' -T fields -e ip.src -e ip.dst -e ldap.name -e ldap.simple -O ldap -r network_capture_ftp.pcapng "http && http.request.method==POST"
 
 Afterwards figure out how to see if credentials were accepted or not
