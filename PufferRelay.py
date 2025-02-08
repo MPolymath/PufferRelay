@@ -53,6 +53,30 @@ def extract_http_bind_requests(pcap_file):
 
     return extracted_data
 
+def extract_ftp_bind_requests(pcap_file):
+    """Extracts FTP form data"""
+    
+    # Open the capture file with a filter for FTP Requests
+    capture = pyshark.FileCapture(pcap_file, display_filter="ftp && (ftp.request.command == USER || ftp.request.command == PASS)")
+    capture.set_debug 
+    extracted_data = []
+    
+    for packet in capture:
+        try:
+            # Extract source and destination IPs
+            src_ip = packet.ip.src if hasattr(packet, 'ip') else "N/A"
+            dst_ip = packet.ip.dst if hasattr(packet, 'ip') else "N/A"
+            # Extract HTTP fields
+            ftp_request_command = packet.ftp.get('ftp.request.command', 'N/A') if hasattr(packet, 'ftp') else "N/A"  # Get full URL
+            ftp_request_arg = packet.ftp.get('ftp.request.arg', 'N/A') if hasattr(packet, 'ftp') else "N/A"  # Get form content
+            
+            extracted_data.append((src_ip, dst_ip, ftp_request_command, ftp_request_arg))
+        
+        except AttributeError:
+            continue  # Skip packets that don't have the expected attributes
+
+    return extracted_data
+
 def create_database():
     """Creates an SQLite database with a table for storing LDAP bind requests."""
     conn = sqlite3.connect("ldap_bind_requests.db")
@@ -80,6 +104,17 @@ def create_database():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ftp_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_ip TEXT,
+            destination_ip TEXT,
+            ftp_request_command TEXT,
+            ftp_request_arg TEXT,
+            UNIQUE(source_ip, destination_ip, ftp_request_command, ftp_request_arg)
+        )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -100,6 +135,11 @@ def insert_into_database(protocol, data):
             INSERT OR IGNORE INTO http_requests (source_ip, destination_ip, http_url, http_form)
             VALUES (?, ?, ?, ?)
         """, data)
+    elif protocol=="ftp":
+        cursor.executemany("""
+            INSERT OR IGNORE INTO ftp_requests (source_ip, destination_ip, ftp_request_command, ftp_request_arg)
+            VALUES (?, ?, ?, ?)
+        """, data)
 
     conn.commit()
     conn.close()
@@ -108,6 +148,7 @@ def main(pcap_file):
     create_database()   # Ensure the database exists
     ldap_data = extract_ldap_bind_requests(pcap_file)  # Extract ldap data from .pcap
     http_data = extract_http_bind_requests(pcap_file)  # Extract http data from .pcap
+    ftp_data = extract_ftp_bind_requests(pcap_file)  # Extract http data from .pcap
 
     if ldap_data:
         insert_into_database("ldap", ldap_data)  # Store in database
@@ -115,6 +156,9 @@ def main(pcap_file):
     elif http_data:
         insert_into_database("http", http_data)  # Store in database
         print("HTTP data successfully stored in the database.")
+    elif ftp_data:
+        insert_into_database("ftp", ftp_data)  # Store in database
+        print("FTP data successfully stored in the database.")
     else:
         print("No pertinent requests found.")
         return
@@ -144,10 +188,20 @@ def main(pcap_file):
     # Print the table in a readable format
     print(tabulate(rows, headers=headers, tablefmt="fancy_grid"))  # Options: "fancy_grid", "grid", "psql"
 
+    # Fetch FTP requests from the database
+    cursor.execute("SELECT 'FTP', source_ip, destination_ip, ftp_request_command, ftp_request_arg FROM ftp_requests WHERE ftp_request_command IN ('USER', 'PASS')")
+    rows = cursor.fetchall()
+
+    # Define column headers
+    headers = ["Protocol", "Source IP", "Destination IP", "COMMAND", "PASS"]
+
+    # Print the table in a readable format
+    print(tabulate(rows, headers=headers, tablefmt="fancy_grid"))  # Options: "fancy_grid", "grid", "psql"
+
     # Close the connection
     conn.close()    
 
 # Run the script with a sample pcap file
 # pcap_file = "network_capture_http.pcapng"
-pcap_file = "network_capture_ldap.pcapng"
+pcap_file = "network_capture_ftp.pcapng"
 main(pcap_file)
