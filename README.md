@@ -1,5 +1,5 @@
 <p align="center">
-  ![Image Alt text](Logos/PufferRelayTitle-removebg-preview.png "Optional title")
+  <img width="460" height="300" src="Logos/PufferRelayTitle-removebg-preview.png">
 </p>
 
 
