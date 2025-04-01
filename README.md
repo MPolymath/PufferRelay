@@ -1,4 +1,34 @@
-
-PufferRelay is a pentesting tool to extract valuable information from .pcap (wireshark) files.<br>
-<br>
 ![Image Alt text](Logos/Puffer1.webp "Optional title")
+
+# PufferRelay
+
+**PufferRelay** is a pentesting tool designed to extract valuable information from `.pcap` (Wireshark) files.  
+It focuses on parsing and analyzing network traffic to surface sensitive or actionable data that may aid in offensive security operations.
+
+---
+
+## 🔍 Features
+
+- Extracts protocol-specific data (LDAP, HTTP, FTP, etc.)
+- Parses `.pcap` files and stores data in a queryable SQL format
+- Designed for use in red teaming and network traffic analysis
+- Modular structure for easy extension
+
+---
+
+## 🚀 Getting Started
+
+Instructions coming soon — stay tuned!
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from the community! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## 📄 License
+
+Licensed under the [Apache License 2.0](LICENSE).  
+See the [NOTICE](NOTICE) file for attribution details.
