@@ -26,6 +26,9 @@ pip3 install -r requirements.txt <br>
 ### ▶️ Usage
 python3 -m PufferRelay -f {filename} <br>
 
+### Documentation
+The <a href="https://mpolymath.gitbook.io/pufferrelay">Wiki</a> is under construction but will be available soon !
+
 ---
 
 ## 🤝 Contributing
