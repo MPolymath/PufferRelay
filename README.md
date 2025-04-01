@@ -18,7 +18,13 @@ It focuses on parsing and analyzing network traffic to surface sensitive or acti
 
 ## 🚀 Getting Started
 
-Instructions coming soon — stay tuned!
+### Install
+python3 -m venv venv
+source venv/bin/activate.fish
+pip3 install -r requirements.txt
+
+### Usage
+python3 -m PufferRelay -f {filename}
 
 ---
 
