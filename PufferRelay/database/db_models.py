@@ -38,5 +38,15 @@ def create_database():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS telnet_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_ip TEXT,
+            destination_ip TEXT,
+            telnet_data TEXT,
+            UNIQUE(source_ip, destination_ip, telnet_data)
+        )
+    """)
+
     conn.commit()
     conn.close()
