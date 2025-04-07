@@ -1,7 +1,4 @@
-from PufferRelay.protocols.ldap_handler import process_ldap
-from PufferRelay.protocols.http_handler import process_http
-from PufferRelay.protocols.ftp_handler import process_ftp
-from PufferRelay.protocols.telnet_handler import process_telnet
+from PufferRelay.protocols import process_ldap, process_http, process_ftp, process_telnet, process_smtp
 from PufferRelay.core_imports import logging
 
 def parse_pcap(pcap_file):
@@ -20,10 +17,12 @@ def parse_pcap(pcap_file):
     http_data = process_http(pcap_file)
     ftp_data = process_ftp(pcap_file)
     telnet_data = process_telnet(pcap_file)
+    smtp_data = process_smtp(pcap_file)
 
     return {
         "ldap": ldap_data,
         "http": http_data,
         "ftp": ftp_data,
-        "telnet": telnet_data
+        "telnet": telnet_data,
+        "smtp": smtp_data
     }
