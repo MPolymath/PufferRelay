@@ -48,5 +48,17 @@ def create_database():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS smtp_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_ip TEXT,
+            destination_ip TEXT,
+            smtp_user TEXT,
+            smtp_password TEXT,
+            UNIQUE(source_ip, destination_ip, smtp_user, smtp_password)
+        )
+    """)
+
+
     conn.commit()
     conn.close()

@@ -30,6 +30,11 @@ def insert_into_database(protocol, data):
             INSERT OR IGNORE INTO telnet_requests (source_ip, destination_ip, telnet_data)
             VALUES (?, ?, ?)
         """, data)
+    elif protocol=="smtp":
+        cursor.executemany("""
+            INSERT OR IGNORE INTO smtp_requests (source_ip, destination_ip, smtp_user, smtp_password)
+            VALUES (?, ?, ?, ?)
+        """, data)
 
     conn.commit()
     conn.close()
@@ -120,7 +125,8 @@ def fetch_all_data(conn):
         ("ldap_requests", ["source_ip", "destination_ip", "ldap_name", "ldap_simple"], "LDAP"),
         ("http_requests", ["source_ip", "destination_ip", "http_url", "http_form"], "HTTP"),
         ("ftp_requests", ["source_ip", "destination_ip", "ftp_request_command", "ftp_request_arg"], "FTP", "ftp_request_command IN ('USER', 'PASS')"),
-        ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"], "TELNET")
+        ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"], "TELNET"),
+        ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP")
     ]
 
     for request in requests:
