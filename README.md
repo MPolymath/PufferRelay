@@ -10,7 +10,7 @@ It focuses on parsing and analyzing network traffic to surface sensitive or acti
 ## 🔍 Features
 
 - Extracts protocol-specific data
-  - LDAP, HTTP, FTP, TELNET
+    - LDAP, HTTP, FTP, TELNET, SMTP
 - Parses `.pcap` files and stores data in a queryable SQL format
 - Designed for use in red teaming and network traffic analysis
 - Modular structure for easy extension
