@@ -188,7 +188,7 @@ def display_table(data, headers, protocol):
                 table.add_column(
                     header,
                     style="cyan",
-                    no_wrap=True,
+                    no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     width=15,  # Fixed width for IP addresses
                     justify="left"
@@ -198,7 +198,7 @@ def display_table(data, headers, protocol):
                 table.add_column(
                     header,
                     style="cyan",
-                    no_wrap=True,
+                    no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     width=8,  # Width of "Protocol"
                     justify="left"
@@ -208,7 +208,7 @@ def display_table(data, headers, protocol):
                 table.add_column(
                     header,
                     style="cyan",
-                    no_wrap=True,
+                    no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     width=19,  # Width of "250.250.250.250/24"
                     justify="left"
@@ -218,7 +218,7 @@ def display_table(data, headers, protocol):
                 table.add_column(
                     header,
                     style="cyan",
-                    no_wrap=True,
+                    no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     width=15,  # Width of "250.250.250.250"
                     justify="left"
@@ -252,7 +252,7 @@ def display_table(data, headers, protocol):
                 table.add_column(
                     header,
                     style="cyan",
-                    no_wrap=False,
+                    no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     justify="left",
                     width=30  # Fixed width for LDAP columns
@@ -262,7 +262,7 @@ def display_table(data, headers, protocol):
                 table.add_column(
                     header,
                     style="cyan",
-                    no_wrap=False,
+                    no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     justify="left",
                     width=20  # Fixed width for SMTP columns
@@ -276,7 +276,7 @@ def display_table(data, headers, protocol):
                     overflow="fold",
                     justify="left",
                     min_width=30,  # Minimum width for readability
-                    max_width=80,  # Maximum width to prevent excessive expansion
+                    max_width=None,  # No maximum width to show all content
                     ratio=2  # Give these columns more space than fixed-width columns
                 )
             elif header in ["Username", "Password", "HTTP Auth Username", "HTTP Auth Password"]:
@@ -284,11 +284,11 @@ def display_table(data, headers, protocol):
                 table.add_column(
                     header,
                     style="cyan",
-                    no_wrap=False,
+                    no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     justify="left",
                     min_width=15,  # Minimum width for readability
-                    max_width=40,  # Maximum width to prevent excessive expansion
+                    max_width=None,  # No maximum width to show all content
                     ratio=1  # Give these columns less space than data columns
                 )
             else:
@@ -296,7 +296,7 @@ def display_table(data, headers, protocol):
                 table.add_column(
                     header,
                     style="cyan",
-                    no_wrap=True,
+                    no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     justify="left",
                     width=20  # Fixed width for command columns
