@@ -137,6 +137,7 @@ def fetch_all_data(conn):
         ("ftp_requests", ["source_ip", "destination_ip", "ftp_request_command", "ftp_request_arg"], "FTP", "ftp_request_command IN ('USER', 'PASS')"),
         ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"], "TELNET"),
         ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP"),
+        ("ntlm_requests", ["source_ip", "destination_ip", "username", "ntlm_hash"], "NTLM"),
         ("ip_requests", ["subnet", "ip"], "IP") 
     ]
 
