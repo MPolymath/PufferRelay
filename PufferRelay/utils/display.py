@@ -23,9 +23,9 @@ def highlight_sensitive_data(text):
         
     # List of sensitive keywords to highlight
     sensitive_keywords = [
-        'password', 'pass', 'pwd', 'log', 'login', 'user', 'username',
-        'pw', 'passw', 'passwd', 'pass:', 'user:', 'username:', 'password:',
-        'login:', 'pass ', 'user ', 'authorization:', 'token', 'api', 'key',
+        'password', 'pass', 'pwd', 'log', 'login', 'user', 'username', 'mdp'
+        'pw', 'passw', 'passwd', 'pass:', 'user:', 'username:', 'password:', 'motdepasse'
+        'login:', 'pass ', 'user ', 'authorization:', 'token', 'api', 'key', 'id',
         'uname', '&pass=', '&password=', '&user=', '&username=', '&login=', 'session'
     ]
     
