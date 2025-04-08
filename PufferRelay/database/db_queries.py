@@ -40,6 +40,11 @@ def insert_into_database(protocol, data):
             INSERT OR IGNORE INTO ip_requests (subnet, ip)
             VALUES (?, ?)
         """, data)
+    elif protocol=="ntlm":
+        cursor.executemany("""
+            INSERT OR IGNORE INTO ntlm_requests (source_ip, destination_ip, username, ntlm_hash)
+            VALUES (?, ?, ?, ?)
+        """, data)
 
     conn.commit()
     conn.close()

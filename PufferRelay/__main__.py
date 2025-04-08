@@ -5,9 +5,6 @@ from PufferRelay.core_imports import binascii
 from PufferRelay.core_imports import urllib
 from PufferRelay.core_imports import argparse
 from PufferRelay.pcap_processing.pcap_parser import *
-from PufferRelay.protocols.ldap_handler import process_ldap
-from PufferRelay.protocols.http_handler import process_http
-from PufferRelay.protocols.ftp_handler import process_ftp
 from PufferRelay.database.db_models import create_database
 from PufferRelay.database.db_queries import *
 from PufferRelay.database.db_connector import get_db_connection, close_connection

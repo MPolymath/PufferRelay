@@ -70,6 +70,16 @@ def create_database():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ntlm_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_ip TEXT,
+            destination_ip TEXT,
+            username TEXT,
+            ntlm_hash TEXT,
+            UNIQUE(source_ip, destination_ip, username, ntlm_hash)
+        )
+    """)
 
     conn.commit()
     conn.close()
