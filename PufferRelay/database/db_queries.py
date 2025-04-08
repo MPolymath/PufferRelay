@@ -136,9 +136,9 @@ def highlight_form_data(text):
         
     # List of sensitive keywords to highlight
     sensitive_keywords = [
-        'password', 'pass', 'pwd', 'log', 'login', 'user', 'username',
-        'pw', 'passw', 'passwd', 'pass:', 'user:', 'username:', 'password:',
-        'login:', 'pass ', 'user ', 'authorization:', 'token', 'api', 'key',
+        'password', 'pass', 'pwd', 'log', 'login', 'user', 'username', 'session', 'modepasse',
+        'pw', 'passw', 'passwd', 'pass:', 'user:', 'username:', 'password:', 'id',
+        'login:', 'pass ', 'user ', 'authorization:', 'token', 'api', 'key', 'uid',
         'uname', '&pass=', '&password=', '&user=', '&username=', '&login='
     ]
     
