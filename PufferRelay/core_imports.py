@@ -10,5 +10,6 @@ import dotenv
 import argparse
 import base64
 import re
+import rich
 from collections import defaultdict
 from PufferRelay.config import DB_NAME

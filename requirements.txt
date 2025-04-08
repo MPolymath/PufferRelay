@@ -1,3 +1,3 @@
 pyshark
 python-dotenv
-tabulate
+rich
