@@ -6,6 +6,14 @@ from rich.table import Table
 from rich.console import Console
 from rich.text import Text
 import re
+import shutil
+
+def get_terminal_width():
+    """Get the current terminal width, with a fallback to 80 characters."""
+    try:
+        return shutil.get_terminal_size().columns
+    except:
+        return 80
 
 def insert_into_database(protocol, data):
     """Inserts extracted pertinent information into the database, ensuring uniqueness."""
