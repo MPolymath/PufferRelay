@@ -35,6 +35,11 @@ def insert_into_database(protocol, data):
             INSERT OR IGNORE INTO smtp_requests (source_ip, destination_ip, smtp_user, smtp_password)
             VALUES (?, ?, ?, ?)
         """, data)
+    elif protocol=="ips":
+        cursor.executemany("""
+            INSERT OR IGNORE INTO ip_requests (subnet, ip)
+            VALUES (?, ?)
+        """, data)
 
     conn.commit()
     conn.close()
@@ -116,7 +121,7 @@ def display_table(data, headers, protocol):
 
 def fetch_all_data(conn):
     """
-    Fetch and display LDAP, HTTP, and FTP requests from the database.
+    Fetch and display LDAP, HTTP, FTP, TELNET, SMTP, and IP data from the database.
 
     Args:
         conn (sqlite3.Connection): Active database connection.
@@ -126,7 +131,8 @@ def fetch_all_data(conn):
         ("http_requests", ["source_ip", "destination_ip", "http_url", "http_form"], "HTTP"),
         ("ftp_requests", ["source_ip", "destination_ip", "ftp_request_command", "ftp_request_arg"], "FTP", "ftp_request_command IN ('USER', 'PASS')"),
         ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"], "TELNET"),
-        ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP")
+        ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP"),
+        ("ip_requests", ["subnet", "ip"], "IP") 
     ]
 
     for request in requests:

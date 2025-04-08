@@ -59,6 +59,15 @@ def create_database():
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ip_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subnet TEXT,
+            ip TEXT,
+            UNIQUE(subnet, ip)
+        )
+    """)
+
 
     conn.commit()
     conn.close()
