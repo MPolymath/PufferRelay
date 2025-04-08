@@ -26,7 +26,7 @@ def highlight_sensitive_data(text):
         'password', 'pass', 'pwd', 'log', 'login', 'user', 'username',
         'pw', 'passw', 'passwd', 'pass:', 'user:', 'username:', 'password:',
         'login:', 'pass ', 'user ', 'authorization:', 'token', 'api', 'key',
-        'uname', '&pass=', '&password=', '&user=', '&username=', '&login='
+        'uname', '&pass=', '&password=', '&user=', '&username=', '&login=', 'session'
     ]
     
     # Create a pattern that matches any of the keywords
