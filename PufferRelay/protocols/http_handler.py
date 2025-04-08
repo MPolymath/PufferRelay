@@ -93,7 +93,7 @@ def process_http(pcap_file):
                     if username and password:
                         http_auth_username = username
                         http_auth_password = password
-                        logging.info(f"Found Basic Auth credentials for {src_ip} -> {dst_ip}: {username}:{password}")
+                        logging.debug(f"Found Basic Auth credentials for {src_ip} -> {dst_ip}: {username}:{password}")
                 
                 # Get form content with proper error handling
                 try:
