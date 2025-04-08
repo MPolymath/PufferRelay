@@ -223,15 +223,27 @@ def display_table(data, headers, protocol):
                     width=15,  # Width of "250.250.250.250"
                     justify="left"
                 )
-            elif header in ["Telnet Data", "HTTP Form"]:
-                # These columns should expand fully
+            elif header == "HTTP Form":
+                # HTTP Form column should show full content
                 table.add_column(
                     header,
                     style="cyan",
                     no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     justify="left",
-                    ratio=2  # Give these columns more space
+                    min_width=40,  # Minimum width for readability
+                    max_width=None  # No maximum width to show all content
+                )
+            elif header == "Telnet Data":
+                # Telnet Data column should show full content
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=False,  # Allow text wrapping
+                    overflow="fold",
+                    justify="left",
+                    min_width=40,  # Minimum width for readability
+                    max_width=None  # No maximum width to show all content
                 )
             elif header in ["LDAP Name", "LDAP Simple"]:
                 # LDAP columns should have fixed width
