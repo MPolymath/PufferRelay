@@ -2,6 +2,31 @@ from PufferRelay.core_imports import pyshark
 from PufferRelay.core_imports import urllib
 from PufferRelay.core_imports import binascii
 from PufferRelay.core_imports import base64
+from PufferRelay.core_imports import re
+
+def clean_http_data(data):
+    """
+    Cleans HTTP data by removing line breaks and extra whitespace.
+    
+    Args:
+        data (str): The HTTP data to clean
+        
+    Returns:
+        str: Cleaned HTTP data
+    """
+    if data == "N/A":
+        return data
+    
+    # Remove line breaks and replace with spaces
+    data = data.replace('\r', ' ').replace('\n', ' ')
+    
+    # Replace multiple spaces with a single space
+    data = re.sub(r'\s+', ' ', data)
+    
+    # Remove leading/trailing whitespace
+    data = data.strip()
+    
+    return data
 
 #HTTP extract data
 def process_http(pcap_file):
@@ -20,6 +45,7 @@ def process_http(pcap_file):
             
             # Extract HTTP fields
             http_full_url_path = packet.http.get('http.host', 'N/A') + packet.http.get('http.request.uri', 'N/A') if hasattr(packet, 'http') else "N/A"
+            http_full_url_path = clean_http_data(http_full_url_path)
             
             # Initialize auth and form content
             http_auth_username = "N/A"
@@ -35,8 +61,8 @@ def process_http(pcap_file):
                         auth_string = auth_header.split('Basic ')[1]
                         decoded_auth = base64.b64decode(auth_string).decode('utf-8')
                         username, password = decoded_auth.split(':', 1)
-                        http_auth_username = username
-                        http_auth_password = password
+                        http_auth_username = clean_http_data(username)
+                        http_auth_password = clean_http_data(password)
                     except (IndexError, UnicodeDecodeError, base64.binascii.Error):
                         pass
                 
@@ -50,6 +76,7 @@ def process_http(pcap_file):
                             binary_data = binascii.unhexlify(hex_data)
                             decoded_data = binary_data.decode('utf-8')
                             http_form_content = urllib.parse.unquote(decoded_data)
+                            http_form_content = clean_http_data(http_form_content)
                 except (binascii.Error, UnicodeDecodeError, AttributeError):
                     http_form_content = "N/A"  # Return N/A if any conversion fails
             
