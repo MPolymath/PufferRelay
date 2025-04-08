@@ -1,7 +1,11 @@
 from PufferRelay.core_imports import sqlite3
 from PufferRelay.core_imports import sys
-from PufferRelay.core_imports import tabulate
 from PufferRelay.core_imports import logging
+from PufferRelay.core_imports import rich
+from rich.table import Table
+from rich.console import Console
+from rich.text import Text
+import re
 
 def insert_into_database(protocol, data):
     """Inserts extracted pertinent information into the database, ensuring uniqueness."""
@@ -109,9 +113,48 @@ def fetch_requests(conn, table_name, columns, protocol, conditions=None):
         logging.error(f"Database error while fetching {protocol} data: {e}")
         return []
 
+def highlight_form_data(text):
+    """
+    Highlights sensitive keywords in red.
+    
+    Args:
+        text (str): Text to process
+        
+    Returns:
+        rich.text.Text: Text with highlighted sensitive keywords
+    """
+    if not isinstance(text, str):
+        text = str(text)
+        
+    # List of sensitive keywords to highlight
+    sensitive_keywords = [
+        'password', 'pass', 'pwd', 'log', 'login', 'user', 'username',
+        'pw', 'passw', 'passwd', 'pass:', 'user:', 'username:', 'password:',
+        'login:', 'pass ', 'user ', 'authorization:', 'token', 'api', 'key',
+        'uname', '&pass=', '&password=', '&user=', '&username=', '&login='
+    ]
+    
+    # Create a pattern that matches any of the keywords
+    pattern = '|'.join(map(re.escape, sensitive_keywords))
+    
+    # Split the text into parts based on the pattern
+    parts = re.split(f'({pattern})', text, flags=re.IGNORECASE)
+    
+    # Create a Rich Text object
+    rich_text = Text()
+    
+    # Add each part with appropriate styling
+    for part in parts:
+        if part.lower() in [k.lower() for k in sensitive_keywords]:
+            rich_text.append(part, style="bold red")
+        else:
+            rich_text.append(part)
+    
+    return rich_text
+
 def display_table(data, headers, protocol):
     """
-    Display query results in a table format.
+    Display query results in a table format using Rich.
 
     Args:
         data (list): Data rows to display.
@@ -119,10 +162,29 @@ def display_table(data, headers, protocol):
         protocol (str): Protocol name for logging.
     """
     if data:
-        print(tabulate(data, headers=headers, tablefmt="fancy_grid"))
+        # Create a Rich table
+        table = Table(title=f"{protocol} Data", show_header=True, header_style="bold magenta")
+        
+        # Add columns
+        for header in headers:
+            table.add_column(header, style="cyan")
+        
+        # Add data with highlighted sensitive information
+        for row in data:
+            # Convert each value to Rich Text with sensitive keyword highlighting
+            rich_row = []
+            for val in row:
+                if isinstance(val, str):
+                    rich_row.append(highlight_form_data(val))
+                else:
+                    rich_row.append(str(val))
+            table.add_row(*rich_row)
+        
+        # Print the table
+        console = Console()
+        console.print(table)
     else:
         logging.warning(f"No {protocol} data found.")
-
 
 def fetch_all_data(conn):
     """

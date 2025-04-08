@@ -1,5 +1,4 @@
 from PufferRelay.core_imports import pyshark
-from PufferRelay.core_imports import tabulate
 from PufferRelay.core_imports import sqlite3
 from PufferRelay.core_imports import binascii
 from PufferRelay.core_imports import urllib
