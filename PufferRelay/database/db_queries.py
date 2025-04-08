@@ -170,48 +170,120 @@ def display_table(data, headers, protocol):
         protocol (str): Protocol name for logging.
     """
     if data:
-        # Create a Rich table with no width constraints
+        # Create a Rich table with appropriate width constraints
         table = Table(
             title=f"{protocol} Data",
             show_header=True,
             header_style="bold magenta",
-            expand=True,
+            expand=True,  # Allow table to expand
             show_lines=True,  # Add lines between rows for better readability
             box=rich.box.ROUNDED,  # Use rounded box for better visual appeal
             padding=(0, 1)  # Add padding to prevent content from touching borders
         )
         
-        # Add columns with no width limit and proper alignment
+        # Add columns with appropriate widths based on content type
         for header in headers:
-            # Set specific widths for different column types
-            if "IP" in header:
-                # IP columns need at least 15 characters
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=True,  # Prevent text wrapping
-                    overflow="fold",  # Show all content without truncation
-                    min_width=15,  # Minimum width for IP addresses
-                    width=15,  # Fixed width for IP columns
-                    justify="left"  # Left align the content
-                )
-            elif "Data" in header or "Form" in header or "URL" in header:
-                # Data columns can expand and wrap
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    justify="left"
-                )
-            else:
-                # Other columns (like Protocol) have default width
+            if "IP" in header and protocol != "IP":  # IP columns for non-IP tables
+                # IP columns need exactly 15 characters (for 250.250.250.250)
                 table.add_column(
                     header,
                     style="cyan",
                     no_wrap=True,
                     overflow="fold",
+                    width=15,  # Fixed width for IP addresses
                     justify="left"
+                )
+            elif header == "Protocol":
+                # Protocol column should be exactly the width of "Protocol"
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=True,
+                    overflow="fold",
+                    width=8,  # Width of "Protocol"
+                    justify="left"
+                )
+            elif header == "Subnet" and protocol == "IP":
+                # Subnet column should fit 250.250.250.250/24
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=True,
+                    overflow="fold",
+                    width=19,  # Width of "250.250.250.250/24"
+                    justify="left"
+                )
+            elif header == "IP" and protocol == "IP":
+                # IP column should fit 250.250.250.250
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=True,
+                    overflow="fold",
+                    width=15,  # Width of "250.250.250.250"
+                    justify="left"
+                )
+            elif header in ["Telnet Data", "HTTP Form"]:
+                # These columns should expand fully
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=False,  # Allow text wrapping
+                    overflow="fold",
+                    justify="left",
+                    ratio=2  # Give these columns more space
+                )
+            elif header in ["LDAP Name", "LDAP Simple"]:
+                # LDAP columns should have fixed width
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=False,
+                    overflow="fold",
+                    justify="left",
+                    width=30  # Fixed width for LDAP columns
+                )
+            elif header in ["SMTP User", "SMTP Password"]:
+                # SMTP credential columns should have fixed width
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=False,
+                    overflow="fold",
+                    justify="left",
+                    width=20  # Fixed width for SMTP columns
+                )
+            elif header in ["HTTP URL", "FTP Request Arg", "NTLM Hash"]:
+                # Data-heavy columns get priority and can expand
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=False,  # Allow text wrapping
+                    overflow="fold",
+                    justify="left",
+                    min_width=30,  # Minimum width for readability
+                    max_width=80  # Maximum width to prevent excessive expansion
+                )
+            elif header in ["Username", "Password", "HTTP Auth Username", "HTTP Auth Password"]:
+                # Credential columns can expand but don't get priority
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=False,
+                    overflow="fold",
+                    justify="left",
+                    min_width=15,  # Minimum width for readability
+                    max_width=40  # Maximum width to prevent excessive expansion
+                )
+            else:
+                # Other columns (like FTP Request Command) have default width
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=True,
+                    overflow="fold",
+                    justify="left",
+                    width=20  # Fixed width for command columns
                 )
         
         # Add data with highlighted sensitive information
@@ -220,17 +292,12 @@ def display_table(data, headers, protocol):
             rich_row = []
             for val in row:
                 if isinstance(val, str):
-                    # For Telnet data, split into multiple lines if it's too long
-                    if protocol == "TELNET" and len(val) > 100:
-                        # Split the data into chunks of 100 characters
-                        chunks = [val[i:i+100] for i in range(0, len(val), 100)]
-                        val = "\n".join(chunks)
                     rich_row.append(highlight_form_data(val))
                 else:
                     rich_row.append(str(val))
             table.add_row(*rich_row)
         
-        # Print the table with no width constraints
+        # Print the table with appropriate width constraints
         console = Console(
             width=None,  # No width limit
             force_terminal=True,  # Force terminal output
@@ -271,12 +338,12 @@ def fetch_all_data(conn):
         auth_data = cursor.fetchall()
         
         if auth_data:
-            # Create a Rich table for Basic Auth credentials with no width constraints
+            # Create a Rich table for Basic Auth credentials with appropriate width constraints
             table = Table(
                 title="HTTP Basic Authentication Credentials by IP Pair",
                 show_header=True,
                 header_style="bold magenta",
-                expand=True,
+                expand=False,  # Don't expand to full width
                 show_lines=True,
                 box=rich.box.ROUNDED,
                 padding=(0, 1)
@@ -285,8 +352,8 @@ def fetch_all_data(conn):
             # Add columns with fixed widths for IP columns
             table.add_column("Source IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
             table.add_column("Destination IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
-            table.add_column("Username", style="cyan", no_wrap=True, overflow="fold", justify="left")
-            table.add_column("Password", style="cyan", no_wrap=True, overflow="fold", justify="left")
+            table.add_column("Username", style="cyan", no_wrap=False, overflow="fold", min_width=15, max_width=40, justify="left")
+            table.add_column("Password", style="cyan", no_wrap=False, overflow="fold", min_width=15, max_width=40, justify="left")
             
             # Group credentials by IP pair
             ip_pairs = {}
@@ -306,7 +373,7 @@ def fetch_all_data(conn):
                     "\n".join(cred[1] for cred in creds)
                 )
             
-            # Print the table with no width constraints
+            # Print the table with appropriate width constraints
             console = Console(
                 width=None,
                 force_terminal=True,
