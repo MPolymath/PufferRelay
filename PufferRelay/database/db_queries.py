@@ -17,8 +17,8 @@ def insert_into_database(protocol, data):
         """, data)
     elif protocol=="http":
         cursor.executemany("""
-            INSERT OR IGNORE INTO http_requests (source_ip, destination_ip, http_url, http_form)
-            VALUES (?, ?, ?, ?)
+            INSERT OR IGNORE INTO http_requests (source_ip, destination_ip, http_url, http_form, http_auth_username, http_auth_password)
+            VALUES (?, ?, ?, ?, ?, ?)
         """, data)
     elif protocol=="ftp":
         cursor.executemany("""

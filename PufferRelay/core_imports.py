@@ -8,5 +8,6 @@ import os
 import logging
 import dotenv
 import argparse
+import base64
 from collections import defaultdict
 from PufferRelay.config import DB_NAME

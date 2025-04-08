@@ -23,7 +23,9 @@ def create_database():
             destination_ip TEXT,
             http_url TEXT,
             http_form TEXT,
-            UNIQUE(source_ip, destination_ip, http_url, http_form)
+            http_auth_username TEXT,
+            http_auth_password TEXT,
+            UNIQUE(source_ip, destination_ip, http_url, http_form, http_auth_username, http_auth_password)
         )
     """)
 
