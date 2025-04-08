@@ -170,12 +170,49 @@ def display_table(data, headers, protocol):
         protocol (str): Protocol name for logging.
     """
     if data:
-        # Create a Rich table
-        table = Table(title=f"{protocol} Data", show_header=True, header_style="bold magenta")
+        # Create a Rich table with no width constraints
+        table = Table(
+            title=f"{protocol} Data",
+            show_header=True,
+            header_style="bold magenta",
+            expand=True,
+            show_lines=True,  # Add lines between rows for better readability
+            box=rich.box.ROUNDED,  # Use rounded box for better visual appeal
+            padding=(0, 1)  # Add padding to prevent content from touching borders
+        )
         
-        # Add columns
+        # Add columns with no width limit and proper alignment
         for header in headers:
-            table.add_column(header, style="cyan")
+            # Set specific widths for different column types
+            if "IP" in header:
+                # IP columns need at least 15 characters
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=True,  # Prevent text wrapping
+                    overflow="fold",  # Show all content without truncation
+                    min_width=15,  # Minimum width for IP addresses
+                    width=15,  # Fixed width for IP columns
+                    justify="left"  # Left align the content
+                )
+            elif "Data" in header or "Form" in header or "URL" in header:
+                # Data columns can expand and wrap
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=False,  # Allow text wrapping
+                    overflow="fold",
+                    justify="left"
+                )
+            else:
+                # Other columns (like Protocol) have default width
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=True,
+                    overflow="fold",
+                    justify="left"
+                )
         
         # Add data with highlighted sensitive information
         for row in data:
@@ -183,14 +220,25 @@ def display_table(data, headers, protocol):
             rich_row = []
             for val in row:
                 if isinstance(val, str):
+                    # For Telnet data, split into multiple lines if it's too long
+                    if protocol == "TELNET" and len(val) > 100:
+                        # Split the data into chunks of 100 characters
+                        chunks = [val[i:i+100] for i in range(0, len(val), 100)]
+                        val = "\n".join(chunks)
                     rich_row.append(highlight_form_data(val))
                 else:
                     rich_row.append(str(val))
             table.add_row(*rich_row)
         
-        # Print the table
-        console = Console()
+        # Print the table with no width constraints
+        console = Console(
+            width=None,  # No width limit
+            force_terminal=True,  # Force terminal output
+            color_system="auto",  # Use appropriate color system
+            soft_wrap=True  # Enable soft wrapping for long content
+        )
         console.print(table)
+        console.print()  # Add extra newline for better separation
     else:
         logging.warning(f"No {protocol} data found.")
 
@@ -223,12 +271,22 @@ def fetch_all_data(conn):
         auth_data = cursor.fetchall()
         
         if auth_data:
-            # Create a Rich table for Basic Auth credentials
-            table = Table(title="HTTP Basic Authentication Credentials by IP Pair", show_header=True, header_style="bold magenta")
-            table.add_column("Source IP", style="cyan")
-            table.add_column("Destination IP", style="cyan")
-            table.add_column("Username", style="cyan")
-            table.add_column("Password", style="cyan")
+            # Create a Rich table for Basic Auth credentials with no width constraints
+            table = Table(
+                title="HTTP Basic Authentication Credentials by IP Pair",
+                show_header=True,
+                header_style="bold magenta",
+                expand=True,
+                show_lines=True,
+                box=rich.box.ROUNDED,
+                padding=(0, 1)
+            )
+            
+            # Add columns with fixed widths for IP columns
+            table.add_column("Source IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
+            table.add_column("Destination IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
+            table.add_column("Username", style="cyan", no_wrap=True, overflow="fold", justify="left")
+            table.add_column("Password", style="cyan", no_wrap=True, overflow="fold", justify="left")
             
             # Group credentials by IP pair
             ip_pairs = {}
@@ -248,11 +306,16 @@ def fetch_all_data(conn):
                     "\n".join(cred[1] for cred in creds)
                 )
             
-            # Print the table
-            console = Console()
+            # Print the table with no width constraints
+            console = Console(
+                width=None,
+                force_terminal=True,
+                color_system="auto",
+                soft_wrap=True
+            )
             console.print("\nHTTP Basic Authentication Credentials by IP Pair:")
             console.print(table)
-            print("=" * get_terminal_width())
+            console.print("=" * get_terminal_width())
     except sqlite3.Error as e:
         logging.error(f"Error fetching HTTP Basic Auth data: {e}")
 
