@@ -224,26 +224,28 @@ def display_table(data, headers, protocol):
                     justify="left"
                 )
             elif header == "HTTP Form":
-                # HTTP Form column should show full content
+                # HTTP Form column should be the largest and wrap to multiple lines
                 table.add_column(
                     header,
                     style="cyan",
                     no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     justify="left",
-                    min_width=40,  # Minimum width for readability
-                    max_width=None  # No maximum width to show all content
+                    min_width=60,  # Minimum width for readability
+                    max_width=None,  # No maximum width to show all content
+                    ratio=3  # Give this column more space than others
                 )
             elif header == "Telnet Data":
-                # Telnet Data column should show full content
+                # Telnet Data column should be the largest and wrap to multiple lines
                 table.add_column(
                     header,
                     style="cyan",
                     no_wrap=False,  # Allow text wrapping
                     overflow="fold",
                     justify="left",
-                    min_width=40,  # Minimum width for readability
-                    max_width=None  # No maximum width to show all content
+                    min_width=60,  # Minimum width for readability
+                    max_width=None,  # No maximum width to show all content
+                    ratio=3  # Give this column more space than others
                 )
             elif header in ["LDAP Name", "LDAP Simple"]:
                 # LDAP columns should have fixed width
@@ -274,7 +276,8 @@ def display_table(data, headers, protocol):
                     overflow="fold",
                     justify="left",
                     min_width=30,  # Minimum width for readability
-                    max_width=80  # Maximum width to prevent excessive expansion
+                    max_width=80,  # Maximum width to prevent excessive expansion
+                    ratio=2  # Give these columns more space than fixed-width columns
                 )
             elif header in ["Username", "Password", "HTTP Auth Username", "HTTP Auth Password"]:
                 # Credential columns can expand but don't get priority
@@ -285,7 +288,8 @@ def display_table(data, headers, protocol):
                     overflow="fold",
                     justify="left",
                     min_width=15,  # Minimum width for readability
-                    max_width=40  # Maximum width to prevent excessive expansion
+                    max_width=40,  # Maximum width to prevent excessive expansion
+                    ratio=1  # Give these columns less space than data columns
                 )
             else:
                 # Other columns (like FTP Request Command) have default width
