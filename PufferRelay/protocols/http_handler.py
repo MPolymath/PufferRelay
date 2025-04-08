@@ -3,6 +3,8 @@ from PufferRelay.core_imports import urllib
 from PufferRelay.core_imports import binascii
 from PufferRelay.core_imports import base64
 from PufferRelay.core_imports import re
+from PufferRelay.core_imports import logging
+from PufferRelay.core_imports import defaultdict
 
 def clean_http_data(data):
     """
@@ -28,7 +30,34 @@ def clean_http_data(data):
     
     return data
 
-#HTTP extract data
+def decode_basic_auth(auth_header):
+    """
+    Decodes Basic Authentication credentials from base64.
+    
+    Args:
+        auth_header (str): The Authorization header value
+        
+    Returns:
+        tuple: (username, password) or (None, None) if decoding fails
+    """
+    try:
+        if not auth_header or 'Basic ' not in auth_header:
+            return None, None
+            
+        # Extract the base64 part
+        auth_string = auth_header.split('Basic ')[1]
+        
+        # Decode base64
+        decoded_auth = base64.b64decode(auth_string).decode('utf-8')
+        
+        # Split into username and password
+        username, password = decoded_auth.split(':', 1)
+        
+        return clean_http_data(username), clean_http_data(password)
+    except (IndexError, UnicodeDecodeError, base64.binascii.Error) as e:
+        logging.error(f"Error decoding Basic Auth: {str(e)}")
+        return None, None
+
 def process_http(pcap_file):
     """Extracts HTTP form data and basic authentication credentials"""
     
@@ -43,6 +72,10 @@ def process_http(pcap_file):
             src_ip = packet.ip.src if hasattr(packet, 'ip') else "N/A"
             dst_ip = packet.ip.dst if hasattr(packet, 'ip') else "N/A"
             
+            # Skip if we don't have valid IPs
+            if src_ip == "N/A" or dst_ip == "N/A":
+                continue
+            
             # Extract HTTP fields
             http_full_url_path = packet.http.get('http.host', 'N/A') + packet.http.get('http.request.uri', 'N/A') if hasattr(packet, 'http') else "N/A"
             http_full_url_path = clean_http_data(http_full_url_path)
@@ -55,16 +88,12 @@ def process_http(pcap_file):
             if hasattr(packet, 'http'):
                 # Check for basic authentication
                 auth_header = packet.http.get('http.authorization', 'N/A')
-                if auth_header != 'N/A' and 'Basic' in auth_header:
-                    try:
-                        # Extract and decode base64 credentials
-                        auth_string = auth_header.split('Basic ')[1]
-                        decoded_auth = base64.b64decode(auth_string).decode('utf-8')
-                        username, password = decoded_auth.split(':', 1)
-                        http_auth_username = clean_http_data(username)
-                        http_auth_password = clean_http_data(password)
-                    except (IndexError, UnicodeDecodeError, base64.binascii.Error):
-                        pass
+                if auth_header != 'N/A':
+                    username, password = decode_basic_auth(auth_header)
+                    if username and password:
+                        http_auth_username = username
+                        http_auth_password = password
+                        logging.info(f"Found Basic Auth credentials for {src_ip} -> {dst_ip}: {username}:{password}")
                 
                 # Get form content with proper error handling
                 try:
@@ -80,8 +109,11 @@ def process_http(pcap_file):
                 except (binascii.Error, UnicodeDecodeError, AttributeError):
                     http_form_content = "N/A"  # Return N/A if any conversion fails
             
-            # Only add to extracted data if we have meaningful information
-            if (http_auth_username != "N/A" and http_auth_password != "N/A") or http_form_content != "N/A":
+            # Always add to extracted data if we have Basic Auth credentials
+            if http_auth_username != "N/A" and http_auth_password != "N/A":
+                extracted_data.append((src_ip, dst_ip, http_full_url_path, http_form_content, http_auth_username, http_auth_password))
+            # Also add if we have form content
+            elif http_form_content != "N/A":
                 extracted_data.append((src_ip, dst_ip, http_full_url_path, http_form_content, http_auth_username, http_auth_password))
         
         except AttributeError:

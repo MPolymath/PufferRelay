@@ -195,7 +195,7 @@ def fetch_all_data(conn):
     """
     requests = [
         ("ldap_requests", ["source_ip", "destination_ip", "ldap_name", "ldap_simple"], "LDAP"),
-        ("http_requests", ["source_ip", "destination_ip", "http_url", "http_form"], "HTTP"),
+        ("http_requests", ["source_ip", "destination_ip", "http_url", "http_form", "http_auth_username", "http_auth_password"], "HTTP"),
         ("ftp_requests", ["source_ip", "destination_ip", "ftp_request_command", "ftp_request_arg"], "FTP", "ftp_request_command IN ('USER', 'PASS')"),
         ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"], "TELNET"),
         ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP"),
@@ -203,6 +203,52 @@ def fetch_all_data(conn):
         ("ip_requests", ["subnet", "ip"], "IP") 
     ]
 
+    # First, display unique IP pairs with Basic Auth credentials
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT source_ip, destination_ip, http_auth_username, http_auth_password 
+            FROM http_requests 
+            WHERE http_auth_username != 'N/A' AND http_auth_password != 'N/A'
+            ORDER BY source_ip, destination_ip
+        """)
+        auth_data = cursor.fetchall()
+        
+        if auth_data:
+            # Create a Rich table for Basic Auth credentials
+            table = Table(title="HTTP Basic Authentication Credentials by IP Pair", show_header=True, header_style="bold magenta")
+            table.add_column("Source IP", style="cyan")
+            table.add_column("Destination IP", style="cyan")
+            table.add_column("Username", style="cyan")
+            table.add_column("Password", style="cyan")
+            
+            # Group credentials by IP pair
+            ip_pairs = {}
+            for src_ip, dst_ip, username, password in auth_data:
+                key = (src_ip, dst_ip)
+                if key not in ip_pairs:
+                    ip_pairs[key] = []
+                ip_pairs[key].append((username, password))
+            
+            # Add data to the table
+            for (src_ip, dst_ip), creds in ip_pairs.items():
+                # Add IP pair row
+                table.add_row(
+                    src_ip,
+                    dst_ip,
+                    "\n".join(cred[0] for cred in creds),
+                    "\n".join(cred[1] for cred in creds)
+                )
+            
+            # Print the table
+            console = Console()
+            console.print("\nHTTP Basic Authentication Credentials by IP Pair:")
+            console.print(table)
+            print("=" * get_terminal_width())
+    except sqlite3.Error as e:
+        logging.error(f"Error fetching HTTP Basic Auth data: {e}")
+
+    # Then display other protocol data
     for request in requests:
         table_name, columns, protocol, *conditions = request
         data = fetch_requests(conn, table_name, columns, protocol, *conditions)
