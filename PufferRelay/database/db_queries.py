@@ -345,60 +345,74 @@ def fetch_all_data(conn):
     # First, display unique IP pairs with Basic Auth credentials
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT DISTINCT source_ip, destination_ip, http_auth_username, http_auth_password 
-            FROM http_requests 
-            WHERE http_auth_username != 'N/A' AND http_auth_password != 'N/A'
-            ORDER BY source_ip, destination_ip
-        """)
-        auth_data = cursor.fetchall()
         
-        if auth_data:
-            # Create a Rich table for Basic Auth credentials with appropriate width constraints
-            table = Table(
-                title="HTTP Basic Authentication Credentials by IP Pair",
-                show_header=True,
-                header_style="bold magenta",
-                expand=False,  # Don't expand to full width
-                show_lines=True,
-                box=rich.box.ROUNDED,
-                padding=(0, 1)
-            )
-            
-            # Add columns with fixed widths for IP columns
-            table.add_column("Source IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
-            table.add_column("Destination IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
-            table.add_column("Username", style="cyan", no_wrap=False, overflow="fold", min_width=15, max_width=40, justify="left")
-            table.add_column("Password", style="cyan", no_wrap=False, overflow="fold", min_width=15, max_width=40, justify="left")
-            
-            # Group credentials by IP pair
-            ip_pairs = {}
-            for src_ip, dst_ip, username, password in auth_data:
-                key = (src_ip, dst_ip)
-                if key not in ip_pairs:
-                    ip_pairs[key] = []
-                ip_pairs[key].append((username, password))
-            
-            # Add data to the table
-            for (src_ip, dst_ip), creds in ip_pairs.items():
-                # Add IP pair row
-                table.add_row(
-                    src_ip,
-                    dst_ip,
-                    "\n".join(cred[0] for cred in creds),
-                    "\n".join(cred[1] for cred in creds)
-                )
-            
-            # Print the table with appropriate width constraints
-            console = Console(
-                width=None,
-                force_terminal=True,
-                color_system="auto",
-                soft_wrap=True
-            )
-            console.print("\nHTTP Basic Authentication Credentials by IP Pair:")
-            console.print(table)
-            console.print("=" * get_terminal_width())
+        # Check if the http_requests table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='http_requests'")
+        if not cursor.fetchone():
+            logging.warning("http_requests table does not exist in the database.")
+        else:
+            # Check if the table has the required columns
+            cursor.execute("PRAGMA table_info(http_requests)")
+            columns = [col[1] for col in cursor.fetchall()]
+            required_columns = {'http_auth_username', 'http_auth_password'}
+            if not all(col in columns for col in required_columns):
+                logging.warning("http_requests table is missing required columns for Basic Auth.")
+            else:
+                # Query for Basic Auth credentials
+                cursor.execute("""
+                    SELECT DISTINCT source_ip, destination_ip, http_auth_username, http_auth_password 
+                    FROM http_requests 
+                    WHERE http_auth_username != 'N/A' AND http_auth_password != 'N/A'
+                    ORDER BY source_ip, destination_ip
+                """)
+                auth_data = cursor.fetchall()
+                
+                if auth_data:
+                    # Create a Rich table for Basic Auth credentials with appropriate width constraints
+                    table = Table(
+                        title="HTTP Basic Authentication Credentials by IP Pair",
+                        show_header=True,
+                        header_style="bold magenta",
+                        expand=False,  # Don't expand to full width
+                        show_lines=True,
+                        box=rich.box.ROUNDED,
+                        padding=(0, 1)
+                    )
+                    
+                    # Add columns with fixed widths for IP columns
+                    table.add_column("Source IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
+                    table.add_column("Destination IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
+                    table.add_column("Username", style="cyan", no_wrap=False, overflow="fold", min_width=15, max_width=40, justify="left")
+                    table.add_column("Password", style="cyan", no_wrap=False, overflow="fold", min_width=15, max_width=40, justify="left")
+                    
+                    # Group credentials by IP pair
+                    ip_pairs = {}
+                    for src_ip, dst_ip, username, password in auth_data:
+                        key = (src_ip, dst_ip)
+                        if key not in ip_pairs:
+                            ip_pairs[key] = []
+                        ip_pairs[key].append((username, password))
+                    
+                    # Add data to the table
+                    for (src_ip, dst_ip), creds in ip_pairs.items():
+                        # Add IP pair row
+                        table.add_row(
+                            src_ip,
+                            dst_ip,
+                            "\n".join(cred[0] for cred in creds),
+                            "\n".join(cred[1] for cred in creds)
+                        )
+                    
+                    # Print the table with appropriate width constraints
+                    console = Console(
+                        width=None,
+                        force_terminal=True,
+                        color_system="auto",
+                        soft_wrap=True
+                    )
+                    console.print("\nHTTP Basic Authentication Credentials by IP Pair:")
+                    console.print(table)
+                    console.print("=" * get_terminal_width())
     except sqlite3.Error as e:
         logging.error(f"Error fetching HTTP Basic Auth data: {e}")
 
