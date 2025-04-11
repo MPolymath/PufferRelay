@@ -9,7 +9,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Database Configuration
 DB_TYPE = "sqlite"  # Could be "postgresql", "mysql", etc.
-DB_NAME = os.getenv("DB_NAME", os.path.join(PROJECT_ROOT, "ldap_bind_requests.db"))  # Default is SQLite file
+DB_NAME = os.getenv("DB_NAME", os.path.join(PROJECT_ROOT, "extracted_data.db"))  # Default is SQLite file
 
 # PCAP File Storage
 PCAP_STORAGE_FILE = os.getenv("PCAP_STORAGE_FILE", os.path.join(PROJECT_ROOT, "network_capture_ftp.pcapng"))
