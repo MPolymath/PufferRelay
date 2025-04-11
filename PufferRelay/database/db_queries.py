@@ -55,10 +55,13 @@ def insert_into_database(protocol, data):
                 VALUES (?, ?, ?, ?)
             """, data)
         elif protocol == "ips":
-            cursor.executemany("""
-                INSERT OR IGNORE INTO ip_requests (subnet, ip)
-                VALUES (?, ?)
-            """, data)
+            # For IP data, we need to insert each IP separately
+            for subnet, ips in data:
+                for ip in ips:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO ip_requests (subnet, ip)
+                        VALUES (?, ?)
+                    """, (subnet, ip))
         elif protocol == "ntlm":
             cursor.executemany("""
                 INSERT OR IGNORE INTO ntlm_requests (source_ip, destination_ip, username, ntlm_hash)
