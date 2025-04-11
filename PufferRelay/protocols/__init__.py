@@ -5,3 +5,4 @@ from .telnet_handler import process_telnet
 from .smtp_handler import process_smtp
 from .ip_handler import process_ips
 from .ntlm_handler import process_ntlm
+from .netbios_handler import process_netbios

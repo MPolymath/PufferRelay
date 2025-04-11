@@ -64,6 +64,11 @@ def insert_into_database(protocol, data):
                 INSERT OR IGNORE INTO ntlm_requests (source_ip, destination_ip, username, ntlm_hash)
                 VALUES (?, ?, ?, ?)
             """, data)
+        elif protocol == "netbios":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO netbios_requests (domain_workgroup, hostname, ip, mac)
+                VALUES (?, ?, ?, ?)
+            """, data)
 
         conn.commit()
     except sqlite3.Error as e:
@@ -312,7 +317,7 @@ def display_table(data, headers, protocol):
 
 def fetch_all_data(conn):
     """
-    Fetch and display LDAP, HTTP, FTP, TELNET, SMTP, and IP data from the database.
+    Fetch and display LDAP, HTTP, FTP, TELNET, SMTP, IP, NTLM, and NetBIOS data from the database.
 
     Args:
         conn (sqlite3.Connection): Active database connection.
@@ -328,7 +333,8 @@ def fetch_all_data(conn):
         ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"], "TELNET"),
         ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP"),
         ("ntlm_requests", ["source_ip", "destination_ip", "username", "ntlm_hash"], "NTLM"),
-        ("ip_requests", ["subnet", "ip"], "IP") 
+        ("ip_requests", ["subnet", "ip"], "IP"),
+        ("netbios_requests", ["domain_workgroup", "hostname", "ip", "mac"], "NetBIOS")
     ]
 
     # First, display unique IP pairs with Basic Auth credentials
