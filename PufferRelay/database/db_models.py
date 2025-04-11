@@ -1,9 +1,15 @@
 from PufferRelay.core_imports import sqlite3
 from PufferRelay.core_imports import logging
 from PufferRelay.config import DB_NAME
+from .db_version import check_database_version, set_db_schema_version
 
 def create_database():
     """Creates an SQLite database with tables for storing various protocol requests."""
+    # Check database version first
+    if not check_database_version():
+        logging.error("Database version check failed. Exiting.")
+        return False
+        
     conn = None
     try:
         conn = sqlite3.connect(DB_NAME)
@@ -92,13 +98,28 @@ def create_database():
             )
         """)
 
+        # Create NetBIOS requests table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS netbios_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                domain_workgroup TEXT,
+                hostname TEXT,
+                ip TEXT,
+                mac TEXT,
+                UNIQUE(domain_workgroup, hostname, ip, mac)
+            )
+        """)
+
+        # Set the schema version
+        set_db_schema_version(conn)
+
         # Verify all tables were created
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = cursor.fetchall()
         required_tables = {
             'ldap_requests', 'http_requests', 'ftp_requests', 
             'telnet_requests', 'smtp_requests', 'ip_requests', 
-            'ntlm_requests'
+            'ntlm_requests', 'netbios_requests'
         }
         created_tables = {table[0] for table in tables}
         
@@ -109,9 +130,10 @@ def create_database():
 
         conn.commit()
         logging.info("Database and all tables created successfully")
+        return True
     except sqlite3.Error as e:
         logging.error(f"Database error: {e}")
-        raise
+        return False
     finally:
         if conn:
             conn.close()
