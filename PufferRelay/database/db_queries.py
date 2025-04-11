@@ -198,7 +198,28 @@ def display_table(data, headers, protocol):
     
     # Add columns with appropriate widths based on content type
     for header in headers:
-        if "IP" in header and protocol != "IP":
+        if protocol == "IP":
+            if header == "Subnet":
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=False,
+                    overflow="fold",
+                    width=19,
+                    justify="left"
+                )
+            elif header == "IPs":
+                table.add_column(
+                    header,
+                    style="cyan",
+                    no_wrap=False,
+                    overflow="fold",
+                    justify="left",
+                    min_width=30,
+                    max_width=None,
+                    ratio=3
+                )
+        elif "IP" in header and protocol != "IP":
             table.add_column(
                 header,
                 style="cyan",
@@ -214,24 +235,6 @@ def display_table(data, headers, protocol):
                 no_wrap=False,
                 overflow="fold",
                 width=8,
-                justify="left"
-            )
-        elif header == "Subnet" and protocol == "IP":
-            table.add_column(
-                header,
-                style="cyan",
-                no_wrap=False,
-                overflow="fold",
-                width=19,
-                justify="left"
-            )
-        elif header == "IP" and protocol == "IP":
-            table.add_column(
-                header,
-                style="cyan",
-                no_wrap=False,
-                overflow="fold",
-                width=15,
                 justify="left"
             )
         elif header in ["HTTP Form", "Telnet Data"]:
@@ -299,7 +302,10 @@ def display_table(data, headers, protocol):
     for row in data:
         rich_row = []
         for val in row:
-            if isinstance(val, str):
+            if protocol == "IP" and isinstance(val, list):
+                # For IP protocol, join the list of IPs with newlines
+                rich_row.append("\n".join(val))
+            elif isinstance(val, str):
                 rich_row.append(highlight_form_data(val))
             else:
                 rich_row.append(str(val))
@@ -413,6 +419,13 @@ def fetch_all_data(conn):
     # Then display other protocol data
     for request in requests:
         table_name, columns, protocol, *conditions = request
-        data = fetch_requests(conn, table_name, columns, protocol, *conditions)
-        headers = ["Protocol"] + [col.replace("_", " ").title() for col in columns]
+        if protocol == "IP":
+            # Special handling for IP data
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT subnet, GROUP_CONCAT(ip, '\n') FROM ip_requests GROUP BY subnet ORDER BY subnet")
+            data = cursor.fetchall()
+            headers = ["Subnet", "IPs"]
+        else:
+            data = fetch_requests(conn, table_name, columns, protocol, *conditions)
+            headers = ["Protocol"] + [col.replace("_", " ").title() for col in columns]
         display_table(data, headers, protocol)

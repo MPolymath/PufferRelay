@@ -1,15 +1,16 @@
 from PufferRelay.core_imports import pyshark
 from ipaddress import ip_network, ip_address
+from collections import defaultdict
 
 def process_ips(pcap_file):
     """
-    Extracts all unique source and destination IPs from a pcap file and sorts them by subnet.
+    Extracts all unique source and destination IPs from a pcap file and groups them by subnet.
     
     Args:
         pcap_file (str): Path to the pcap file
         
     Returns:
-        list: List of tuples containing (subnet, ip) pairs
+        list: List of tuples containing (subnet, list_of_ips)
     """
     # Open the capture file without any filter to get all packets
     capture = pyshark.FileCapture(pcap_file)
@@ -28,19 +29,24 @@ def process_ips(pcap_file):
     
     capture.close()
     
-    # Create list of (subnet, ip) tuples
-    ip_tuples = []
+    # Group IPs by subnet
+    subnet_groups = defaultdict(list)
     for ip in unique_ips:
         try:
             # Convert IP to network object to get subnet
             network = ip_network(f"{ip}/24", strict=False)  # Using /24 as default subnet
             subnet = str(network)
-            ip_tuples.append((subnet, ip))
+            subnet_groups[subnet].append(ip)
         except ValueError:
             # Handle invalid IP addresses
             continue
     
-    # Sort the tuples by subnet and then by IP
-    ip_tuples.sort(key=lambda x: (x[0], ip_address(x[1])))
+    # Sort IPs within each subnet
+    for subnet in subnet_groups:
+        subnet_groups[subnet].sort(key=ip_address)
     
-    return ip_tuples 
+    # Convert to list of tuples and sort by subnet
+    result = [(subnet, ips) for subnet, ips in subnet_groups.items()]
+    result.sort(key=lambda x: ip_network(x[0]))
+    
+    return result 
