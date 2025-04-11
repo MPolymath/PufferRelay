@@ -2,8 +2,7 @@ from PufferRelay.core_imports import (
     sqlite3,
     os,
     logging,
-    time,
-    input
+    time
 )
 from PufferRelay.config import DB_NAME
 
