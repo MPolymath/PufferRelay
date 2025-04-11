@@ -1,12 +1,15 @@
-from PufferRelay.core_imports import sqlite3
-from PufferRelay.core_imports import sys
-from PufferRelay.core_imports import logging
-from PufferRelay.core_imports import rich
+from PufferRelay.core_imports import (
+    sqlite3,
+    sys,
+    logging,
+    rich,
+    re,
+    shutil
+)
 from rich.table import Table
 from rich.console import Console
 from rich.text import Text
-import re
-import shutil
+from PufferRelay.config import DB_NAME
 
 def get_terminal_width():
     """Get the current terminal width, with a fallback to 80 characters."""
@@ -17,49 +20,57 @@ def get_terminal_width():
 
 def insert_into_database(protocol, data):
     """Inserts extracted pertinent information into the database, ensuring uniqueness."""
-    
-    conn = sqlite3.connect("ldap_bind_requests.db")
-    cursor = conn.cursor()
-    
-    # Insert only if the combination does not already exist
-    if protocol=="ldap":
-        cursor.executemany("""
-            INSERT OR IGNORE INTO ldap_requests (source_ip, destination_ip, ldap_name, ldap_simple)
-            VALUES (?, ?, ?, ?)
-        """, data)
-    elif protocol=="http":
-        cursor.executemany("""
-            INSERT OR IGNORE INTO http_requests (source_ip, destination_ip, http_url, http_form, http_auth_username, http_auth_password)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, data)
-    elif protocol=="ftp":
-        cursor.executemany("""
-            INSERT OR IGNORE INTO ftp_requests (source_ip, destination_ip, ftp_request_command, ftp_request_arg)
-            VALUES (?, ?, ?, ?)
-        """, data)
-    elif protocol=="telnet":
-        cursor.executemany("""
-            INSERT OR IGNORE INTO telnet_requests (source_ip, destination_ip, telnet_data)
-            VALUES (?, ?, ?)
-        """, data)
-    elif protocol=="smtp":
-        cursor.executemany("""
-            INSERT OR IGNORE INTO smtp_requests (source_ip, destination_ip, smtp_user, smtp_password)
-            VALUES (?, ?, ?, ?)
-        """, data)
-    elif protocol=="ips":
-        cursor.executemany("""
-            INSERT OR IGNORE INTO ip_requests (subnet, ip)
-            VALUES (?, ?)
-        """, data)
-    elif protocol=="ntlm":
-        cursor.executemany("""
-            INSERT OR IGNORE INTO ntlm_requests (source_ip, destination_ip, username, ntlm_hash)
-            VALUES (?, ?, ?, ?)
-        """, data)
+    if not data:
+        return
+        
+    conn = None
+    try:
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        
+        # Insert only if the combination does not already exist
+        if protocol == "ldap":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO ldap_requests (source_ip, destination_ip, ldap_name, ldap_simple)
+                VALUES (?, ?, ?, ?)
+            """, data)
+        elif protocol == "http":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO http_requests (source_ip, destination_ip, http_url, http_form, http_auth_username, http_auth_password)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, data)
+        elif protocol == "ftp":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO ftp_requests (source_ip, destination_ip, ftp_request_command, ftp_request_arg)
+                VALUES (?, ?, ?, ?)
+            """, data)
+        elif protocol == "telnet":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO telnet_requests (source_ip, destination_ip, telnet_data)
+                VALUES (?, ?, ?)
+            """, data)
+        elif protocol == "smtp":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO smtp_requests (source_ip, destination_ip, smtp_user, smtp_password)
+                VALUES (?, ?, ?, ?)
+            """, data)
+        elif protocol == "ips":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO ip_requests (subnet, ip)
+                VALUES (?, ?)
+            """, data)
+        elif protocol == "ntlm":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO ntlm_requests (source_ip, destination_ip, username, ntlm_hash)
+                VALUES (?, ?, ?, ?)
+            """, data)
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"Database error while inserting {protocol} data: {e}")
+    finally:
+        if conn:
+            conn.close()
 
 def store_data(protocol: str, data):
     """
@@ -71,25 +82,21 @@ def store_data(protocol: str, data):
     """
     if data:
         insert_into_database(protocol, data)
-        print(f"{protocol.upper()} data successfully stored in the database.")
+        logging.info(f"{protocol.upper()} data successfully stored in the database.")
 
 def process_extracted_data(parsed_data):
     """
     Processes extracted protocol data and stores it if available.
 
     Args:
-        ldap_data: Extracted LDAP data.
-        http_data: Extracted HTTP data.
-        ftp_data: Extracted FTP data.
+        parsed_data (dict): Dictionary containing protocol data to process.
     """
     for protocol, data in parsed_data.items():
         if data:
             store_data(protocol, data)
-            logging.info(f"{protocol.upper()} data successfully stored in the database.")
 
     if not any(parsed_data.values()):
         logging.info("No pertinent requests found.")
-        return
 
 def fetch_requests(conn, table_name, columns, protocol, conditions=None):
     """
@@ -169,161 +176,139 @@ def display_table(data, headers, protocol):
         headers (list): Column headers.
         protocol (str): Protocol name for logging.
     """
-    if data:
-        # Create a Rich table with appropriate width constraints
-        table = Table(
-            title=f"{protocol} Data",
-            show_header=True,
-            header_style="bold magenta",
-            expand=True,  # Allow table to expand
-            show_lines=True,  # Add lines between rows for better readability
-            box=rich.box.ROUNDED,  # Use rounded box for better visual appeal
-            padding=(0, 1)  # Add padding to prevent content from touching borders
-        )
-        
-        # Add columns with appropriate widths based on content type
-        for header in headers:
-            if "IP" in header and protocol != "IP":  # IP columns for non-IP tables
-                # IP columns need exactly 15 characters (for 250.250.250.250)
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    width=15,  # Fixed width for IP addresses
-                    justify="left"
-                )
-            elif header == "Protocol":
-                # Protocol column should be exactly the width of "Protocol"
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    width=8,  # Width of "Protocol"
-                    justify="left"
-                )
-            elif header == "Subnet" and protocol == "IP":
-                # Subnet column should fit 250.250.250.250/24
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    width=19,  # Width of "250.250.250.250/24"
-                    justify="left"
-                )
-            elif header == "IP" and protocol == "IP":
-                # IP column should fit 250.250.250.250
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    width=15,  # Width of "250.250.250.250"
-                    justify="left"
-                )
-            elif header == "HTTP Form":
-                # HTTP Form column should be the largest and wrap to multiple lines
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    justify="left",
-                    min_width=60,  # Minimum width for readability
-                    max_width=None,  # No maximum width to show all content
-                    ratio=3  # Give this column more space than others
-                )
-            elif header == "Telnet Data":
-                # Telnet Data column should be the largest and wrap to multiple lines
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    justify="left",
-                    min_width=60,  # Minimum width for readability
-                    max_width=None,  # No maximum width to show all content
-                    ratio=3  # Give this column more space than others
-                )
-            elif header in ["LDAP Name", "LDAP Simple"]:
-                # LDAP columns should have fixed width
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    justify="left",
-                    width=30  # Fixed width for LDAP columns
-                )
-            elif header in ["SMTP User", "SMTP Password"]:
-                # SMTP credential columns should have fixed width
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    justify="left",
-                    width=20  # Fixed width for SMTP columns
-                )
-            elif header in ["HTTP URL", "FTP Request Arg", "NTLM Hash"]:
-                # Data-heavy columns get priority and can expand
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    justify="left",
-                    min_width=30,  # Minimum width for readability
-                    max_width=None,  # No maximum width to show all content
-                    ratio=2  # Give these columns more space than fixed-width columns
-                )
-            elif header in ["Username", "Password", "HTTP Auth Username", "HTTP Auth Password"]:
-                # Credential columns can expand but don't get priority
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    justify="left",
-                    min_width=15,  # Minimum width for readability
-                    max_width=None,  # No maximum width to show all content
-                    ratio=1  # Give these columns less space than data columns
-                )
-            else:
-                # Other columns (like FTP Request Command) have default width
-                table.add_column(
-                    header,
-                    style="cyan",
-                    no_wrap=False,  # Allow text wrapping
-                    overflow="fold",
-                    justify="left",
-                    width=20  # Fixed width for command columns
-                )
-        
-        # Add data with highlighted sensitive information
-        for row in data:
-            # Convert each value to Rich Text with sensitive keyword highlighting
-            rich_row = []
-            for val in row:
-                if isinstance(val, str):
-                    rich_row.append(highlight_form_data(val))
-                else:
-                    rich_row.append(str(val))
-            table.add_row(*rich_row)
-        
-        # Print the table with appropriate width constraints
-        console = Console(
-            width=None,  # No width limit
-            force_terminal=True,  # Force terminal output
-            color_system="auto",  # Use appropriate color system
-            soft_wrap=True  # Enable soft wrapping for long content
-        )
-        console.print(table)
-        console.print()  # Add extra newline for better separation
-    else:
+    if not data:
         logging.warning(f"No {protocol} data found.")
+        return
+
+    # Create a Rich table with appropriate width constraints
+    table = Table(
+        title=f"{protocol} Data",
+        show_header=True,
+        header_style="bold magenta",
+        expand=True,
+        show_lines=True,
+        box=rich.box.ROUNDED,
+        padding=(0, 1)
+    )
+    
+    # Add columns with appropriate widths based on content type
+    for header in headers:
+        if "IP" in header and protocol != "IP":
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                width=15,
+                justify="left"
+            )
+        elif header == "Protocol":
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                width=8,
+                justify="left"
+            )
+        elif header == "Subnet" and protocol == "IP":
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                width=19,
+                justify="left"
+            )
+        elif header == "IP" and protocol == "IP":
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                width=15,
+                justify="left"
+            )
+        elif header in ["HTTP Form", "Telnet Data"]:
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                justify="left",
+                min_width=60,
+                max_width=None,
+                ratio=3
+            )
+        elif header in ["LDAP Name", "LDAP Simple"]:
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                justify="left",
+                width=30
+            )
+        elif header in ["SMTP User", "SMTP Password"]:
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                justify="left",
+                width=20
+            )
+        elif header in ["HTTP URL", "FTP Request Arg", "NTLM Hash"]:
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                justify="left",
+                min_width=30,
+                max_width=None,
+                ratio=2
+            )
+        elif header in ["Username", "Password", "HTTP Auth Username", "HTTP Auth Password"]:
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                justify="left",
+                min_width=15,
+                max_width=None,
+                ratio=1
+            )
+        else:
+            table.add_column(
+                header,
+                style="cyan",
+                no_wrap=False,
+                overflow="fold",
+                justify="left",
+                width=20
+            )
+    
+    # Add data with highlighted sensitive information
+    for row in data:
+        rich_row = []
+        for val in row:
+            if isinstance(val, str):
+                rich_row.append(highlight_form_data(val))
+            else:
+                rich_row.append(str(val))
+        table.add_row(*rich_row)
+    
+    # Print the table with appropriate width constraints
+    console = Console(
+        width=None,
+        force_terminal=True,
+        color_system="auto",
+        soft_wrap=True
+    )
+    console.print(table)
+    console.print()
 
 def fetch_all_data(conn):
     """
@@ -332,6 +317,10 @@ def fetch_all_data(conn):
     Args:
         conn (sqlite3.Connection): Active database connection.
     """
+    if not conn:
+        logging.error("Database connection is not available.")
+        return
+
     requests = [
         ("ldap_requests", ["source_ip", "destination_ip", "ldap_name", "ldap_simple"], "LDAP"),
         ("http_requests", ["source_ip", "destination_ip", "http_url", "http_form", "http_auth_username", "http_auth_password"], "HTTP"),
@@ -368,18 +357,18 @@ def fetch_all_data(conn):
                 auth_data = cursor.fetchall()
                 
                 if auth_data:
-                    # Create a Rich table for Basic Auth credentials with appropriate width constraints
+                    # Create a Rich table for Basic Auth credentials
                     table = Table(
                         title="HTTP Basic Authentication Credentials by IP Pair",
                         show_header=True,
                         header_style="bold magenta",
-                        expand=False,  # Don't expand to full width
+                        expand=False,
                         show_lines=True,
                         box=rich.box.ROUNDED,
                         padding=(0, 1)
                     )
                     
-                    # Add columns with fixed widths for IP columns
+                    # Add columns with fixed widths
                     table.add_column("Source IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
                     table.add_column("Destination IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
                     table.add_column("Username", style="cyan", no_wrap=False, overflow="fold", min_width=15, max_width=40, justify="left")
@@ -395,7 +384,6 @@ def fetch_all_data(conn):
                     
                     # Add data to the table
                     for (src_ip, dst_ip), creds in ip_pairs.items():
-                        # Add IP pair row
                         table.add_row(
                             src_ip,
                             dst_ip,
@@ -403,7 +391,7 @@ def fetch_all_data(conn):
                             "\n".join(cred[1] for cred in creds)
                         )
                     
-                    # Print the table with appropriate width constraints
+                    # Print the table
                     console = Console(
                         width=None,
                         force_terminal=True,

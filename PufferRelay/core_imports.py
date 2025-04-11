@@ -11,5 +11,6 @@ import argparse
 import base64
 import re
 import rich
+import shutil
 from collections import defaultdict
 from PufferRelay.config import DB_NAME
