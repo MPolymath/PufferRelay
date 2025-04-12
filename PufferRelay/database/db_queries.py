@@ -68,10 +68,12 @@ def insert_into_database(protocol, data):
                 VALUES (?, ?, ?, ?)
             """, data)
         elif protocol == "netbios":
+            logging.debug(f"Inserting NetBIOS data: {data}")
             cursor.executemany("""
-                INSERT OR IGNORE INTO netbios_requests (domain_workgroup, hostname, ip, mac)
-                VALUES (?, ?, ?, ?)
+                INSERT OR IGNORE INTO netbios_requests (domain_workgroup, hostname, other_service, src_ip, src_mac, service_type)
+                VALUES (?, ?, ?, ?, ?, ?)
             """, data)
+            logging.debug(f"Inserted {cursor.rowcount} NetBIOS records")
 
         conn.commit()
     except sqlite3.Error as e:
@@ -432,12 +434,20 @@ def fetch_all_data(conn):
             # Special handling for NetBIOS data
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT domain_workgroup, hostname, src_ip, src_mac, service_type 
+                SELECT 
+                    CASE 
+                        WHEN domain_workgroup != 'N/A' THEN domain_workgroup
+                        WHEN hostname != 'N/A' THEN hostname
+                        ELSE other_service
+                    END as identifier,
+                    src_ip,
+                    src_mac,
+                    service_type
                 FROM netbios_requests 
-                ORDER BY domain_workgroup, hostname
+                ORDER BY identifier, service_type
             """)
             data = cursor.fetchall()
-            headers = ["Domain/Workgroup", "Hostname", "Source IP", "Source MAC", "Service Type"]
+            headers = ["Identifier", "Source IP", "Source MAC", "Service Type"]
         else:
             data = fetch_requests(conn, table_name, columns, protocol, *conditions)
             headers = ["Protocol"] + [col.replace("_", " ").title() for col in columns]

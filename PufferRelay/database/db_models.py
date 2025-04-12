@@ -104,10 +104,11 @@ def create_database():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 domain_workgroup TEXT,
                 hostname TEXT,
+                other_service TEXT,
                 src_ip TEXT,
                 src_mac TEXT,
                 service_type TEXT,
-                UNIQUE(domain_workgroup, hostname, src_ip, src_mac, service_type)
+                UNIQUE(domain_workgroup, hostname, other_service, src_ip, src_mac, service_type)
             )
         """)
 
