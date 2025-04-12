@@ -63,10 +63,29 @@ def insert_into_database(protocol, data):
                         VALUES (?, ?)
                     """, (subnet, ip))
         elif protocol == "ntlm":
-            cursor.executemany("""
-                INSERT OR IGNORE INTO ntlm_requests (source_ip, destination_ip, username, ntlm_hash)
-                VALUES (?, ?, ?, ?)
-            """, data)
+            # For NTLM data, we need to check for existing usernames
+            for entry in data:
+                src_ip, dst_ip, username, ntlm_hash = entry
+                # Check if this username already exists
+                cursor.execute("""
+                    SELECT COUNT(*) FROM ntlm_requests 
+                    WHERE username = ?
+                """, (username,))
+                if cursor.fetchone()[0] == 0:
+                    # If username doesn't exist, insert new record
+                    cursor.execute("""
+                        INSERT INTO ntlm_requests (source_ip, destination_ip, username, ntlm_hash)
+                        VALUES (?, ?, ?, ?)
+                    """, (src_ip, dst_ip, username, ntlm_hash))
+                    logging.debug(f"Inserted new NTLM hash for username: {username}")
+                else:
+                    # If username exists, update the existing record
+                    cursor.execute("""
+                        UPDATE ntlm_requests 
+                        SET source_ip = ?, destination_ip = ?, ntlm_hash = ?
+                        WHERE username = ?
+                    """, (src_ip, dst_ip, ntlm_hash, username))
+                    logging.debug(f"Updated NTLM hash for existing username: {username}")
         elif protocol == "netbios":
             logging.debug(f"Inserting NetBIOS data: {data}")
             cursor.executemany("""
