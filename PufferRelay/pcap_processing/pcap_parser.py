@@ -1,4 +1,4 @@
-from PufferRelay.protocols import process_ldap, process_http, process_ftp, process_telnet, process_smtp, process_ips, process_ntlm
+from PufferRelay.protocols import process_ldap, process_http, process_ftp, process_telnet, process_smtp, process_ips, process_ntlm, process_netbios
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
 import threading
@@ -39,6 +39,7 @@ def parse_pcap(pcap_file):
         smtp_data = process_smtp(pcap_file)
         ntlm_data = process_ntlm(pcap_file)
         ip_data = process_ips(pcap_file)
+        netbios_data = process_netbios(pcap_file)
 
         # Stop animation and show ready message
         animation_running = False
@@ -52,7 +53,8 @@ def parse_pcap(pcap_file):
             "telnet": telnet_data,
             "smtp": smtp_data,
             "ntlm": ntlm_data,
-            "ips": ip_data
+            "ips": ip_data,
+            "netbios": netbios_data
         }
     except Exception as e:
         # Ensure animation stops even if there's an error

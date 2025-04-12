@@ -1,103 +1,79 @@
 from PufferRelay.core_imports import pyshark
 from PufferRelay.core_imports import logging
-from collections import defaultdict
+
+# NetBIOS service type mapping
+NETBIOS_SERVICE_TYPES = {
+    '0': 'Workstation Service',
+    '3': 'Messenger Service',
+    '32': 'File Server Service (SMB)',
+    '27': 'Domain Master Browser',
+    '28': 'Domain Controllers (Group)',
+    '29': 'Master Browser',
+    '30': 'Browser Service Elections',
+    '31': 'NetDDE Service'
+}
+
+def get_service_type(hex_type):
+    """Convert NetBIOS hex type to human-readable service type."""
+    return NETBIOS_SERVICE_TYPES.get(hex_type.upper(), f'Unknown Service ({hex_type})')
 
 def process_netbios(pcap_file):
     """
-    Extracts NetBIOS information including hostnames, IPs, MAC addresses, and domain/workgroup details.
-    Ensures unique hostnames per domain and workgroup.
+    Extracts NetBIOS information including service types from network captures.
     
     Args:
         pcap_file (str): Path to the pcap file
         
     Returns:
-        list: List of tuples containing (domain/workgroup, hostname, ip, mac)
+        list: List of tuples containing (domain_workgroup, hostname, other_service, src_ip, src_mac, service_type)
     """
-    # Open the capture file with a filter for NetBIOS traffic
-    capture = pyshark.FileCapture(pcap_file, display_filter="nbns || nbss")
-    
-    # Dictionary to store host information, organized by domain/workgroup
-    domain_hosts = defaultdict(dict)  # For domain hosts
-    workgroup_hosts = defaultdict(dict)  # For workgroup hosts
+    # Filter for NetBIOS packets
+    capture = pyshark.FileCapture(pcap_file, display_filter="nbns")
+    extracted_data = []
     
     for packet in capture:
         try:
-            # Extract source and destination IPs and MACs
+            # Extract source IP and MAC
             src_ip = packet.ip.src if hasattr(packet, 'ip') else "N/A"
-            dst_ip = packet.ip.dst if hasattr(packet, 'ip') else "N/A"
             src_mac = packet.eth.src if hasattr(packet, 'eth') else "N/A"
-            dst_mac = packet.eth.dst if hasattr(packet, 'eth') else "N/A"
+            
+            if src_ip == "N/A" or src_mac == "N/A":
+                continue
             
             # Initialize NetBIOS fields
-            hostname = "N/A"
             domain_workgroup = "N/A"
-            is_domain = False
+            hostname = "N/A"
+            other_service = "N/A"
+            service_type = "N/A"
             
             if hasattr(packet, 'nbns'):
-                # Extract NetBIOS name
-                if hasattr(packet.nbns, 'name'):
-                    hostname = packet.nbns.name
-                
-                # Extract domain/workgroup information
+                # Extract service type
                 if hasattr(packet.nbns, 'type'):
-                    if packet.nbns.type in ['0x1C', '0x1B']:  # Domain Master Browser or Domain Controller
-                        domain_workgroup = packet.nbns.name.split('.')[0]  # Extract domain name
-                        is_domain = True
-                    elif packet.nbns.type in ['0x00', '0x1E']:  # Workstation or Browser Service Elections
-                        domain_workgroup = packet.nbns.name.split('.')[0]  # Extract workgroup name
-                        is_domain = False
-            
-            # Store information for both source and destination
-            if hostname != "N/A" and domain_workgroup != "N/A":
-                if src_ip != "N/A" and src_mac != "N/A":
-                    if is_domain:
-                        domain_hosts[domain_workgroup][hostname] = {
-                            'ip': src_ip,
-                            'mac': src_mac
-                        }
+                    service_type = get_service_type(packet.nbns.type)
+                    logging.debug(f"Found NetBIOS type: {packet.nbns.type} -> {service_type}")
+                
+                # Extract name based on service type
+                if hasattr(packet.nbns, 'name'):
+                    name = packet.nbns.name[:15].strip()  # NetBIOS names are 15 chars max
+                    logging.debug(f"Found NetBIOS name: {name}")
+                    
+                    if service_type == 'Workstation Service':
+                        hostname = name
+                    elif service_type in ['Domain Master Browser', 'Domain Controllers (Group)', 
+                                        'Master Browser', 'Browser Service Elections']:
+                        domain_workgroup = name
                     else:
-                        workgroup_hosts[domain_workgroup][hostname] = {
-                            'ip': src_ip,
-                            'mac': src_mac
-                        }
-                if dst_ip != "N/A" and dst_mac != "N/A":
-                    if is_domain:
-                        domain_hosts[domain_workgroup][hostname] = {
-                            'ip': dst_ip,
-                            'mac': dst_mac
-                        }
-                    else:
-                        workgroup_hosts[domain_workgroup][hostname] = {
-                            'ip': dst_ip,
-                            'mac': dst_mac
-                        }
+                        other_service = name
+
+                # Only add to extracted data if we have valid information
+                if service_type != "N/A" and (hostname != "N/A" or domain_workgroup != "N/A" or other_service != "N/A"):
+                    entry = (domain_workgroup, hostname, other_service, src_ip, src_mac, service_type)
+                    logging.debug(f"Adding NetBIOS entry: {entry}")
+                    extracted_data.append(entry)
         
         except AttributeError:
             continue  # Skip packets that don't have the expected attributes
     
     capture.close()
-    
-    # Convert the dictionaries to sorted lists of tuples
-    extracted_data = []
-    
-    # Add domain hosts first
-    for domain, hosts in sorted(domain_hosts.items()):
-        for hostname, info in sorted(hosts.items()):
-            extracted_data.append((
-                f"DOMAIN: {domain}",
-                hostname,
-                info['ip'],
-                info['mac']
-            ))
-    
-    # Add workgroup hosts second
-    for workgroup, hosts in sorted(workgroup_hosts.items()):
-        for hostname, info in sorted(hosts.items()):
-            extracted_data.append((
-                f"WORKGROUP: {workgroup}",
-                hostname,
-                info['ip'],
-                info['mac']
-            ))
-    
+    logging.info(f"Extracted {len(extracted_data)} NetBIOS entries")
     return extracted_data 

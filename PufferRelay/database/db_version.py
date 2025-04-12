@@ -7,7 +7,7 @@ from PufferRelay.core_imports import (
 from PufferRelay.config import DB_NAME
 
 # Current schema version - increment this when making schema changes
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 def get_db_schema_version(conn):
     """
