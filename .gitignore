@@ -3,7 +3,10 @@ network_capture_ldap.pcapng
 network_capture_ftp.pcapng
 network_capture_smtp.pcapng
 network_capture_telnet.pcapng
+network_capture_netbios.pcapng
+network_capture_ntlm.pcapng
 extracted_data.db
 Code-structure
+network_capture_*.pcapng
 __pycache__/
 *.py[cod]
