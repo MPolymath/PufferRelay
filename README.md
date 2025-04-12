@@ -20,12 +20,16 @@ It focuses on parsing and analyzing network traffic to surface sensitive or acti
 ## 🚀 Getting Started
 
 ### 🛠️ Install
-python3 -m venv venv <br>
-source venv/bin/activate.fish <br>
-pip3 install -r requirements.txt <br>
+python3 -m venv venv
+source venv/bin/activate.fish
+pip3 install -r requirements.txt
 
 ### ▶️ Usage
-python3 -m PufferRelay -f {filename} <br>
+python3 -m PufferRelay -f {filename}
+
+### 🐛 DEBUG
+python -m PufferRelay -f {filename} --log-level DEBUG
+
 
 ### Documentation
 The <a href="https://mpolymath.gitbook.io/pufferrelay">Wiki</a> is under construction but will be available soon !

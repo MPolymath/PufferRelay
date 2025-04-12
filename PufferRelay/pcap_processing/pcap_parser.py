@@ -32,29 +32,18 @@ def parse_pcap(pcap_file):
         animation_thread = threading.Thread(target=animation_loop)
         animation_thread.start()
     else:
-        # In debug mode, just print that we're starting
-        print("Starting protocol processing...")
+        logging.info("Starting protocol processing...")
 
     try:
         # Process all protocols
-        print("Starting protocol processing...")
         ldap_data = process_ldap(pcap_file)
-        print("LDAP processed")
         http_data = process_http(pcap_file)
-        print("HTTP processed")
         ftp_data = process_ftp(pcap_file)
-        print("FTP processed")
         telnet_data = process_telnet(pcap_file)
-        print("Telnet processed")
         smtp_data = process_smtp(pcap_file)
-        print("SMTP processed")
-        print("About to process NTLM...")
         ntlm_data = process_ntlm(pcap_file)
-        print("NTLM processed")
         ip_data = process_ips(pcap_file)
-        print("IPs processed")
         netbios_data = process_netbios(pcap_file)
-        print("NetBIOS processed")
 
         # Stop animation if it was started
         if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
@@ -77,5 +66,5 @@ def parse_pcap(pcap_file):
         if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
             animation_running = False
             animation_thread.join()
-        print(f"Error during PCAP parsing: {str(e)}")
+        logging.error(f"Error during PCAP parsing: {str(e)}")
         raise e
