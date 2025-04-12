@@ -14,7 +14,7 @@ import shutil
 import time
 import codecs
 import struct
-import base64
+import asyncio
 from collections import defaultdict
 from ipaddress import ip_network, ip_address
 from rich.table import Table
