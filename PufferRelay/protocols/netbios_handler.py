@@ -3,14 +3,14 @@ from PufferRelay.core_imports import logging
 
 # NetBIOS service type mapping
 NETBIOS_SERVICE_TYPES = {
-    '00': 'Workstation Service',
-    '03': 'Messenger Service',
-    '20': 'File Server Service (SMB)',
-    '1B': 'Domain Master Browser',
-    '1C': 'Domain Controllers (Group)',
-    '1D': 'Master Browser',
-    '1E': 'Browser Service Elections',
-    '1F': 'NetDDE Service'
+    '0': 'Workstation Service',
+    '3': 'Messenger Service',
+    '32': 'File Server Service (SMB)',
+    '27': 'Domain Master Browser',
+    '28': 'Domain Controllers (Group)',
+    '29': 'Master Browser',
+    '30': 'Browser Service Elections',
+    '31': 'NetDDE Service'
 }
 
 def get_service_type(hex_type):
@@ -25,7 +25,7 @@ def process_netbios(pcap_file):
         pcap_file (str): Path to the pcap file
         
     Returns:
-        list: List of tuples containing (domain_workgroup, hostname, src_ip, src_mac, service_type)
+        list: List of tuples containing (domain_workgroup, hostname, other_service, src_ip, src_mac, service_type)
     """
     # Filter for NetBIOS packets
     capture = pyshark.FileCapture(pcap_file, display_filter="nbns")
@@ -43,27 +43,37 @@ def process_netbios(pcap_file):
             # Initialize NetBIOS fields
             domain_workgroup = "N/A"
             hostname = "N/A"
+            other_service = "N/A"
             service_type = "N/A"
             
             if hasattr(packet, 'nbns'):
-                # Extract domain/workgroup name
-                if hasattr(packet.nbns, 'nbns_name'):
-                    domain_workgroup = packet.nbns.name
-                
-                # Extract hostname
-                if hasattr(packet.nbns, 'nbns_hostname'):
-                    hostname = packet.nbns.nbns_hostname
-                
                 # Extract service type
                 if hasattr(packet.nbns, 'type'):
                     service_type = get_service_type(packet.nbns.type)
+                    logging.debug(f"Found NetBIOS type: {packet.nbns.type} -> {service_type}")
                 
+                # Extract name based on service type
+                if hasattr(packet.nbns, 'name'):
+                    name = packet.nbns.name[:15].strip()  # NetBIOS names are 15 chars max
+                    logging.debug(f"Found NetBIOS name: {name}")
+                    
+                    if service_type == 'Workstation Service':
+                        hostname = name
+                    elif service_type in ['Domain Master Browser', 'Domain Controllers (Group)', 
+                                        'Master Browser', 'Browser Service Elections']:
+                        domain_workgroup = name
+                    else:
+                        other_service = name
+
                 # Only add to extracted data if we have valid information
-                if domain_workgroup != "N/A" and hostname != "N/A" and service_type != "N/A":
-                    extracted_data.append((domain_workgroup, hostname, src_ip, src_mac, service_type))
+                if service_type != "N/A" and (hostname != "N/A" or domain_workgroup != "N/A" or other_service != "N/A"):
+                    entry = (domain_workgroup, hostname, other_service, src_ip, src_mac, service_type)
+                    logging.debug(f"Adding NetBIOS entry: {entry}")
+                    extracted_data.append(entry)
         
         except AttributeError:
             continue  # Skip packets that don't have the expected attributes
     
     capture.close()
+    logging.info(f"Extracted {len(extracted_data)} NetBIOS entries")
     return extracted_data 
