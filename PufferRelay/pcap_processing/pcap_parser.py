@@ -16,35 +16,51 @@ def parse_pcap(pcap_file):
     """
     logging.info(f"Parsing PCAP file: {pcap_file}")
 
-    # Initialize loading animation
-    update_animation, show_ready = show_loading_animation()
-    animation_running = True
+    # Only show loading animation if not in debug mode
+    if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
+        # Initialize loading animation
+        update_animation, show_ready = show_loading_animation()
+        animation_running = True
 
-    def animation_loop():
-        """Run the animation until stopped."""
-        while animation_running:
-            update_animation()
-            time.sleep(0.1)
+        def animation_loop():
+            """Run the animation until stopped."""
+            while animation_running:
+                update_animation()
+                time.sleep(0.1)
 
-    # Start loading animation in a separate thread
-    animation_thread = threading.Thread(target=animation_loop)
-    animation_thread.start()
+        # Start loading animation in a separate thread
+        animation_thread = threading.Thread(target=animation_loop)
+        animation_thread.start()
+    else:
+        # In debug mode, just print that we're starting
+        print("Starting protocol processing...")
 
     try:
         # Process all protocols
+        print("Starting protocol processing...")
         ldap_data = process_ldap(pcap_file)
+        print("LDAP processed")
         http_data = process_http(pcap_file)
+        print("HTTP processed")
         ftp_data = process_ftp(pcap_file)
+        print("FTP processed")
         telnet_data = process_telnet(pcap_file)
+        print("Telnet processed")
         smtp_data = process_smtp(pcap_file)
+        print("SMTP processed")
+        print("About to process NTLM...")
         ntlm_data = process_ntlm(pcap_file)
+        print("NTLM processed")
         ip_data = process_ips(pcap_file)
+        print("IPs processed")
         netbios_data = process_netbios(pcap_file)
+        print("NetBIOS processed")
 
-        # Stop animation and show ready message
-        animation_running = False
-        animation_thread.join()
-        show_ready()
+        # Stop animation if it was started
+        if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
+            animation_running = False
+            animation_thread.join()
+            show_ready()
 
         return {
             "ldap": ldap_data,
@@ -57,7 +73,9 @@ def parse_pcap(pcap_file):
             "netbios": netbios_data
         }
     except Exception as e:
-        # Ensure animation stops even if there's an error
-        animation_running = False
-        animation_thread.join()
+        # Stop animation if it was started
+        if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
+            animation_running = False
+            animation_thread.join()
+        print(f"Error during PCAP parsing: {str(e)}")
         raise e
