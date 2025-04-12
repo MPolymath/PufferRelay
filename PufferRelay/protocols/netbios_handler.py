@@ -35,16 +35,16 @@ def process_netbios(pcap_file):
             
             if hasattr(packet, 'nbns'):
                 # Extract NetBIOS name
-                if hasattr(packet.nbns, 'nbns_name'):
-                    hostname = packet.nbns.nbns_name
+                if hasattr(packet.nbns, 'name'):
+                    hostname = packet.nbns.name
                 
                 # Extract domain/workgroup information
-                if hasattr(packet.nbns, 'nbns_type'):
-                    if packet.nbns.nbns_type in ['0x1C', '0x1B']:  # Domain Master Browser or Domain Controller
-                        domain_workgroup = packet.nbns.nbns_name.split('.')[0]  # Extract domain name
+                if hasattr(packet.nbns, 'type'):
+                    if packet.nbns.type in ['0x1C', '0x1B']:  # Domain Master Browser or Domain Controller
+                        domain_workgroup = packet.nbns.name.split('.')[0]  # Extract domain name
                         is_domain = True
-                    elif packet.nbns.nbns_type in ['0x00', '0x1E']:  # Workstation or Browser Service Elections
-                        domain_workgroup = packet.nbns.nbns_name.split('.')[0]  # Extract workgroup name
+                    elif packet.nbns.type in ['0x00', '0x1E']:  # Workstation or Browser Service Elections
+                        domain_workgroup = packet.nbns.name.split('.')[0]  # Extract workgroup name
                         is_domain = False
             
             # Store information for both source and destination
