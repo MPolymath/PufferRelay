@@ -3,5 +3,5 @@ network_capture_ldap.pcapng
 network_capture_ftp.pcapng
 network_capture_smtp.pcapng
 network_capture_telnet.pcapng
-ldap_bind_requests.db
+extracted_data.db
 Code-structure
