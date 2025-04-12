@@ -5,3 +5,5 @@ network_capture_smtp.pcapng
 network_capture_telnet.pcapng
 extracted_data.db
 Code-structure
+__pycache__/
+*.py[cod]
