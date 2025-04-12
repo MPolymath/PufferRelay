@@ -428,6 +428,16 @@ def fetch_all_data(conn):
             cursor.execute("SELECT DISTINCT subnet, GROUP_CONCAT(ip, '\n') FROM ip_requests GROUP BY subnet ORDER BY subnet")
             data = cursor.fetchall()
             headers = ["Subnet", "IPs"]
+        elif protocol == "NetBIOS":
+            # Special handling for NetBIOS data
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT domain_workgroup, hostname, src_ip, src_mac, service_type 
+                FROM netbios_requests 
+                ORDER BY domain_workgroup, hostname
+            """)
+            data = cursor.fetchall()
+            headers = ["Domain/Workgroup", "Hostname", "Source IP", "Source MAC", "Service Type"]
         else:
             data = fetch_requests(conn, table_name, columns, protocol, *conditions)
             headers = ["Protocol"] + [col.replace("_", " ").title() for col in columns]
