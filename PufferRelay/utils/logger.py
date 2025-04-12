@@ -18,6 +18,6 @@
 # Credits: Portions of this code were adapted from PCredz (https://github.com/lgandx/PCredz)
 #         (c) Laurent Gaffie GNU General Public License v3.0.
 
-from .db_connector import *
-from .db_queries import *
-from .db_version import *
+import logging
+import sys
+import os 
