@@ -1,5 +1,4 @@
 import pyshark
-from tabulate import tabulate
 import sqlite3
 import binascii
 import urllib.parse
