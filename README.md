@@ -25,7 +25,11 @@ source venv/bin/activate.fish
 pip3 install -r requirements.txt
 
 ### ▶️ Usage
+#### Parse pcap file into sqlite3 database and display all pertinent information
 python3 -m PufferRelay -f {filename}
+
+#### Read 'DB_NAME' database and extract all pertinent information
+python3 -m PufferRelay -r
 
 ### 🐛 DEBUG
 python -m PufferRelay -f {filename} --log-level DEBUG
