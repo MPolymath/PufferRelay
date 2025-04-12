@@ -28,15 +28,14 @@ def process_ntlm(pcap_file):
             
             if hasattr(packet, 'ntlmssp'):
                 # Check for NTLM type 3 message (contains the hash)
-                if hasattr(packet.ntlmssp, 'ntlmssp_messagetype') and packet.ntlmssp.ntlmssp_messagetype == '3':
-                    # Extract username
-                    if hasattr(packet.ntlmssp, 'ntlmssp_username'):
-                        username = packet.ntlmssp.ntlmssp_username
+                if hasattr(packet.ntlmssp, 'messagetype') and packet.ntlmssp.messagetype == '3':
+                    if hasattr(packet.ntlmssp.auth, 'username'):
+                        username = packet.ntlmssp.auth.username
                     
                     # Extract NTLM hash
-                    if hasattr(packet.ntlmssp, 'ntlmssp_ntresponse'):
+                    if hasattr(packet.ntlmssp.auth, 'ntresponse'):
                         # The NTLM response is in hex format, we'll store it as is
-                        ntlm_hash = packet.ntlmssp.ntlmssp_ntresponse
+                        ntlm_hash = packet.ntlmssp.auth.ntresponse
                     
                     # Only add to extracted data if we have both username and hash
                     if username != "N/A" and ntlm_hash != "N/A":
