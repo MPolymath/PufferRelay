@@ -21,13 +21,13 @@ It focuses on parsing and analyzing network traffic to surface sensitive or acti
 
 ### 🛠️ Install
 #### PIPX
-sudo apt install tshark
-pipx install pufferrelay
+sudo apt install tshark <br>
+pipx install pufferrelay <br>
 
 #### PIP
-python3 -m venv venv
-source venv/bin/activate.fish
-pip3 install -r requirements.txt
+python3 -m venv venv <br>
+source venv/bin/activate.fish <br>
+pip3 install -r requirements.txt <br>
 
 ### ▶️ Usage
 
