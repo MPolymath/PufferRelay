@@ -48,5 +48,5 @@ We welcome contributions from the community! See [CONTRIBUTING.md](CONTRIBUTING.
 
 ## 📄 License
 
-Licensed under the [Apache License 2.0](LICENSE).  
+Licensed under the [GPL-3.0 License](LICENSE).  
 See the [NOTICE](NOTICE) file for attribution details.
