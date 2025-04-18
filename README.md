@@ -20,11 +20,11 @@ It focuses on parsing and analyzing network traffic to surface sensitive or acti
 ## 🚀 Getting Started
 
 ### 🛠️ Install
-#### PIPX
+#### ⚗️PIPX
 sudo apt install tshark <br>
 pipx install pufferrelay <br>
 
-#### PIP
+#### 👨🏿‍🔧PIP
 python3 -m venv venv <br>
 source venv/bin/activate.fish <br>
 pip3 install -r requirements.txt <br>
@@ -32,10 +32,10 @@ pip3 install -r requirements.txt <br>
 ### ▶️ Usage
 
 #### Parse pcap file into sqlite3 database and display all pertinent information
-#### PIPX
+#### ⚗️PIPX
 pufferrelay -f {filename}
 
-#### PIP
+#### 👨🏿‍🔧PIP
 python3 -m PufferRelay -f {filename}
 
 #### Read 'DB_NAME' database and extract all pertinent information
