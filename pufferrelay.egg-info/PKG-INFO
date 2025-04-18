@@ -1,0 +1,85 @@
+Metadata-Version: 2.4
+Name: pufferrelay
+Version: 1.0.0
+Summary: A network protocol analyzer and credential extractor
+Author-email: Massamba DIOUF <your.email@example.com>
+License-Expression: GPL-3.0-or-later
+Project-URL: Homepage, https://github.com/mpolymath/PufferRelay
+Project-URL: Repository, https://github.com/mpolymath/PufferRelay.git
+Project-URL: Documentation, https://github.com/mpolymath/PufferRelay#readme
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Pentesters
+Classifier: Intended Audience :: Cybersecurity
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Security
+Classifier: Topic :: System :: Networking :: Monitoring
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+License-File: NOTICE
+Requires-Dist: pyshark>=0.6
+Requires-Dist: python-dotenv>=1.1.0
+Requires-Dist: rich>=14.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=6.0; extra == "dev"
+Requires-Dist: black>=22.0; extra == "dev"
+Requires-Dist: flake8>=4.0; extra == "dev"
+Requires-Dist: mypy>=0.900; extra == "dev"
+Dynamic: license-file
+
+![Image Alt text](Logos/Puffer1.webp "Optional title")
+
+# PufferRelay
+
+**PufferRelay** is a pentesting tool designed to extract valuable information from `.pcap` (Wireshark) files.  
+It focuses on parsing and analyzing network traffic to surface sensitive or actionable data that may aid in offensive security operations.
+
+---
+
+## 🔍 Features
+
+- Extracts protocol-specific data
+    - LDAP, HTTP, FTP, TELNET, SMTP, NETBIOS, NTLM
+- Parses `.pcap` files and stores data in a queryable SQL format
+- Designed for use in red teaming and network traffic analysis
+- Modular structure for easy extension
+
+---
+
+## 🚀 Getting Started
+
+### 🛠️ Install
+python3 -m venv venv
+source venv/bin/activate.fish
+pip3 install -r requirements.txt
+
+### ▶️ Usage
+#### Parse pcap file into sqlite3 database and display all pertinent information
+python3 -m PufferRelay -f {filename}
+
+#### Read 'DB_NAME' database and extract all pertinent information
+python3 -m PufferRelay -r
+
+### 🐛 DEBUG
+python -m PufferRelay -f {filename} --log-level DEBUG
+
+
+### Documentation
+The <a href="https://mpolymath.gitbook.io/pufferrelay">Wiki</a> is under construction but will be available soon !
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from the community! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## 📄 License
+
+Licensed under the [Apache License 2.0](LICENSE).  
+See the [NOTICE](NOTICE) file for attribution details.

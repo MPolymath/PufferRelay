@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["PufferRelay"]
+
+[project]
+name = "pufferrelay"
+version = "1.0.0"
+description = "A network protocol analyzer and credential extractor"
+readme = "README.md"
+requires-python = ">=3.8"
+license = "GPL-3.0-or-later"
+authors = [
+    {name = "Massamba DIOUF", email = "your.email@example.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Pentesters",
+    "Intended Audience :: Cybersecurity",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Security",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies =[
+    "pyshark>=0.6",
+    "python-dotenv>=1.1.0",
+    "rich>=14.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "black>=22.0",
+    "flake8>=4.0",
+    "mypy>=0.900",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py38']
+include = '\.pyi?$'
+
+[tool.flake8]
+max-line-length = 100
+extend-ignore = ["E203", "W503"]
+exclude = [".git", "__pycache__", "build", "dist"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[project.scripts]
+pufferrelay = "PufferRelay.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/mpolymath/PufferRelay"
+Repository = "https://github.com/mpolymath/PufferRelay.git"
+Documentation = "https://github.com/mpolymath/PufferRelay#readme"
+
+[tool.hatch.build.targets.wheel]
+packages = ["PufferRelay"] 
