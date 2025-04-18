@@ -9,4 +9,6 @@ extracted_data.db
 Code-structure
 network_capture_*.pcapng
 __pycache__/
+pufferrelay.egg-info
+dist
 *.py[cod]
