@@ -20,29 +20,43 @@
 
 from PufferRelay.core_imports import pyshark, logging
 
-#FTP extract data
 def process_ftp(pcap_file):
     """Extracts FTP form data"""
-    
-    # Open the capture file with a filter for FTP Requests
-    capture = pyshark.FileCapture(pcap_file, display_filter="ftp && (ftp.request.command == USER || ftp.request.command == PASS)")
-    capture.set_debug 
-    extracted_data = []
-    
-    for packet in capture:
-        try:
-            # Extract source and destination IPs
-            src_ip = packet.ip.src if hasattr(packet, 'ip') else "N/A"
-            dst_ip = packet.ip.dst if hasattr(packet, 'ip') else "N/A"
-            # Extract HTTP fields
-            ftp_request_command = packet.ftp.get('ftp.request.command', 'N/A') if hasattr(packet, 'ftp') else "N/A"  # Get full URL
-            ftp_request_arg = packet.ftp.get('ftp.request.arg', 'N/A') if hasattr(packet, 'ftp') else "N/A"  # Get form content
-            
-            extracted_data.append((src_ip, dst_ip, ftp_request_command, ftp_request_arg))
+    capture = None
+    try:
+        # Open the capture file with a filter for FTP Requests
+        capture = pyshark.FileCapture(
+            pcap_file,
+            display_filter="ftp && (ftp.request.command==USER || ftp.request.command==PASS)",
+            use_json=True,  # Use JSON output for better stability
+            include_raw=True,  # Include raw packet data
+            debug=True  # Enable debug mode
+        )
+        capture.set_debug()
         
-        except AttributeError:
-            continue  # Skip packets that don't have the expected attributes
+        extracted_data = []
+        for packet in capture:
+            try:
+                # Extract source and destination IPs
+                src_ip = packet.ip.src if hasattr(packet, 'ip') else "N/A"
+                dst_ip = packet.ip.dst if hasattr(packet, 'ip') else "N/A"
+                # Extract FTP fields
+                ftp_request_command = packet.ftp.get('ftp.request.command', 'N/A') if hasattr(packet, 'ftp') else "N/A"  # Get command
+                ftp_request_arg = packet.ftp.get('ftp.request.arg', 'N/A') if hasattr(packet, 'ftp') else "N/A"  # Get argument
+                
+                extracted_data.append((src_ip, dst_ip, ftp_request_command, ftp_request_arg))
+          
+            except AttributeError:
+                continue  # Skip packets that don't have the expected attributes
 
-    capture.close()
-    
-    return extracted_data
+        return extracted_data
+    except Exception as e:
+        logging.error(f"Error processing FTP packets: {str(e)}")
+        raise
+    finally:
+        # Properly close the capture in the finally block
+        if capture is not None:
+            try:
+                capture.close()
+            except Exception as e:
+                logging.error(f"Error closing capture: {str(e)}")
