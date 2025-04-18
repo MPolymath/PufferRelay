@@ -30,9 +30,9 @@ pip3 install -r requirements.txt <br>
 
 ### ▶️ Usage
 #### ⚗️PIPX
-pufferrelay <filename>
+pufferrelay {flag} {filename}
 #### 👨🏿‍🔧PIP
-python3 -m PufferRelay  <flag> {filename}
+python3 -m PufferRelay {flag} {filename}
 
 #### Parse pcap file into sqlite3 database and display all pertinent information
 pufferrelay -f {filename}
