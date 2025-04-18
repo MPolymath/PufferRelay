@@ -460,8 +460,14 @@ def process_ntlm(pcap_file):
             # Properly close the capture in the finally block
             if capture is not None:
                 try:
-                    # Force close the capture without using async
-                    capture._cleanup_subprocess()
+                    # Get the process before closing
+                    process = getattr(capture, '_tshark_process', None)
+                    if process:
+                        # Kill the process directly
+                        process.kill()
+                        process.wait()
+                    # Then close the capture
+                    capture.close()
                 except Exception as e:
                     logging.error(f"Error closing capture: {str(e)}")
     
