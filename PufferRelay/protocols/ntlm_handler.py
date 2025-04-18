@@ -96,6 +96,191 @@ def parse_ntlm_hash(packet_data, challenge):
         logging.error(f"Error parsing NTLM hash: {str(e)}")
         return None
 
+async def process_ntlm_async(pcap_file):
+    """
+    Processes a PCAP file to extract NTLM authentication data asynchronously.
+    
+    Args:
+        pcap_file (str): Path to the PCAP file
+        
+    Returns:
+        list: List of tuples containing (source_ip, destination_ip, username, ntlm_hash)
+    """
+    logging.info(f"Starting NTLM processing for file: {pcap_file}")
+    extracted_data = []
+    
+    max_retries = 3
+    retry_count = 0
+    capture = None
+    
+    while retry_count < max_retries:
+        try:
+            # Open the capture file with a simpler filter
+            capture = pyshark.FileCapture(
+                pcap_file,
+                display_filter="tcp",
+                use_json=True,  # Use JSON output for better stability
+                include_raw=True,  # Include raw packet data
+                debug=True  # Enable debug mode
+            )
+            
+            # Enable debug mode for TShark
+            capture.set_debug()
+            
+            # Dictionary to store challenges by source-destination IP pair
+            challenges = {}
+            processed_hashes = set()  # Track processed hashes to avoid duplicates
+            packet_count = 0  # Track packet number for debugging
+            
+            for packet in capture:
+                packet_count += 1
+                try:
+                    # Extract source and destination IPs
+                    src_ip = packet.ip.src if hasattr(packet, 'ip') else "N/A"
+                    dst_ip = packet.ip.dst if hasattr(packet, 'ip') else "N/A"
+                    
+                    if src_ip == "N/A" or dst_ip == "N/A":
+                        continue
+                    
+                    # Process NTLMSSP messages
+                    if hasattr(packet, 'tcp') and hasattr(packet.tcp, 'payload'):
+                        raw_str = packet.tcp.payload.replace(":", "")
+                        
+                        if len(raw_str) % 2 == 0:  # Ensure even length
+                            raw_data = bytes.fromhex(raw_str)
+                            
+                            # Check for NTLMSSP2 (challenge)
+                            if re.search(b'NTLMSSP\x00\x02\x00\x00\x00', raw_data, re.DOTALL):
+                                # Extract the challenge from the NTLMSSP2 message
+                                # Find the NTLMSSP signature first
+                                ntlmssp_start = raw_data.find(b'NTLMSSP\x00\x02')
+                                if ntlmssp_start == -1:
+                                    logging.error("NTLMSSP2 signature not found")
+                                    continue
+                                
+                                # The challenge is at offset 24 from the start of NTLMSSP
+                                challenge_offset = ntlmssp_start + 24
+                                if challenge_offset + 8 > len(raw_data):
+                                    logging.error(f"Challenge offset {challenge_offset} out of bounds for data length {len(raw_data)}")
+                                    continue
+                                    
+                                challenge = codecs.encode(raw_data[challenge_offset:challenge_offset+8], 'hex')
+                                
+                                # Store challenge for this IP pair
+                                ip_pair = (src_ip, dst_ip)
+                                challenges[ip_pair] = challenge
+                            
+                            # Check for NTLMSSP3 (authentication)
+                            elif re.search(b'NTLMSSP\x00\x03\x00\x00\x00', raw_data, re.DOTALL):
+                                # Look for challenge in both directions
+                                ip_pair = (src_ip, dst_ip)
+                                reverse_pair = (dst_ip, src_ip)
+                                
+                                challenge = None
+                                if ip_pair in challenges:
+                                    challenge = challenges[ip_pair]
+                                elif reverse_pair in challenges:
+                                    challenge = challenges[reverse_pair]
+                                else:
+                                    logging.warning(f"No challenge found for NTLMSSP3 message. IP pair: {ip_pair}, Reverse pair: {reverse_pair}")
+                                
+                                if challenge:
+                                    result = parse_ntlm_hash(raw_data, challenge)
+                                    if result:
+                                        # Create a unique identifier for this hash using username, challenge, and NT hash
+                                        hash_id = f"{result[1]}:{challenge.decode('latin-1')}:{result[0].split(':')[3]}"
+                                        
+                                        # Only process if we haven't seen this hash before
+                                        if hash_id not in processed_hashes:
+                                            processed_hashes.add(hash_id)
+                                            extracted_data.append((src_ip, dst_ip, result[1], result[0]))
+                    
+                    # Process HTTP NTLM messages
+                    if hasattr(packet, 'http'):
+                        # Check for NTLM2 challenge
+                        if hasattr(packet.http, 'www_authenticate'):
+                            www_auth = packet.http.www_authenticate
+                            
+                            if "NTLM " in www_auth:
+                                b64_data = www_auth.split("NTLM ")[1].strip()
+                                
+                                try:
+                                    decoded = base64.b64decode(b64_data)
+                                    
+                                    if re.search(b'NTLMSSP\x00\x02\x00\x00\x00', decoded):
+                                        # Extract the challenge from the HTTP NTLM2 message
+                                        # The challenge is at offset 24 and is 8 bytes long
+                                        challenge = codecs.encode(decoded[24:32], 'hex')
+                                        
+                                        # Store challenge for this IP pair
+                                        ip_pair = (src_ip, dst_ip)
+                                        challenges[ip_pair] = challenge
+                                except Exception as e:
+                                    logging.error(f"Error decoding HTTP NTLM2: {str(e)}")
+                        
+                        # Check for NTLM3 authentication
+                        if hasattr(packet.http, 'authorization'):
+                            auth_header = packet.http.authorization
+                            
+                            if "NTLM " in auth_header:
+                                b64_data = auth_header.split("NTLM ")[1].strip()
+                                
+                                try:
+                                    decoded = base64.b64decode(b64_data)
+                                    
+                                    if re.search(b'NTLMSSP\x00\x03\x00\x00\x00', decoded):
+                                        # Look for challenge in both directions
+                                        ip_pair = (src_ip, dst_ip)
+                                        reverse_pair = (dst_ip, src_ip)
+                                        
+                                        challenge = None
+                                        if ip_pair in challenges:
+                                            challenge = challenges[ip_pair]
+                                        elif reverse_pair in challenges:
+                                            challenge = challenges[reverse_pair]
+                                        else:
+                                            logging.warning(f"No challenge found for HTTP NTLM3 message. IP pair: {ip_pair}, Reverse pair: {reverse_pair}")
+                                        
+                                        if challenge:
+                                            result = parse_ntlm_hash(decoded, challenge)
+                                            if result:
+                                                # Create a unique identifier for this hash using username, challenge, and NT hash
+                                                hash_id = f"{result[1]}:{challenge.decode('latin-1')}:{result[0].split(':')[3]}"
+                                                
+                                                # Only process if we haven't seen this hash before
+                                                if hash_id not in processed_hashes:
+                                                    processed_hashes.add(hash_id)
+                                                    extracted_data.append((src_ip, dst_ip, result[1], result[0]))
+                                except Exception as e:
+                                    logging.error(f"Error decoding HTTP NTLM3: {str(e)}")
+                        
+                except Exception as e:
+                    logging.error(f"Error processing packet #{packet_count}: {str(e)}")
+                    continue
+            
+            # If we get here, the capture was successful
+            logging.info(f"Successfully processed {packet_count} packets")
+            return extracted_data
+                
+        except Exception as e:
+            retry_count += 1
+            logging.error(f"Error processing NTLM packets (attempt {retry_count}/{max_retries}): {str(e)}")
+            if retry_count < max_retries:
+                logging.info("Retrying capture...")
+                continue
+            else:
+                logging.error("Max retries reached. Giving up.")
+                raise
+        finally:
+            # Properly close the capture in the finally block
+            if capture is not None:
+                try:
+                    await capture.close_async()
+                except Exception as e:
+                    logging.error(f"Error closing capture: {str(e)}")
+    
+    return extracted_data
+
 def process_ntlm(pcap_file):
     """
     Processes a PCAP file to extract NTLM authentication data.
