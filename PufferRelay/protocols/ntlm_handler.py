@@ -109,16 +109,29 @@ def process_ntlm(pcap_file):
     logging.info(f"Starting NTLM processing for file: {pcap_file}")
     extracted_data = []
     
-    try:
-        # Open the capture file with a simpler filter
-        with pyshark.FileCapture(pcap_file, display_filter="tcp") as capture:
-            capture.set_debug()  # Enable debug mode for TShark
+    max_retries = 3
+    retry_count = 0
+    capture = None
+    
+    while retry_count < max_retries:
+        try:
+            # Open the capture file with a simpler filter
+            capture = pyshark.FileCapture(
+                pcap_file,
+                display_filter="tcp",
+                use_json=True,  # Use JSON output for better stability
+                include_raw=True,  # Include raw packet data
+                debug=True  # Enable debug mode
+            )
+            
+            # Enable debug mode for TShark
+            capture.set_debug()
             
             # Dictionary to store challenges by source-destination IP pair
             challenges = {}
             processed_hashes = set()  # Track processed hashes to avoid duplicates
             packet_count = 0  # Track packet number for debugging
-        
+            
             for packet in capture:
                 packet_count += 1
                 try:
@@ -244,9 +257,26 @@ def process_ntlm(pcap_file):
                 except Exception as e:
                     logging.error(f"Error processing packet #{packet_count}: {str(e)}")
                     continue
-                    
-    except Exception as e:
-        logging.error(f"Error processing NTLM packets: {str(e)}")
+            
+            # If we get here, the capture was successful
+            logging.info(f"Successfully processed {packet_count} packets")
+            return extracted_data
+                
+        except Exception as e:
+            retry_count += 1
+            logging.error(f"Error processing NTLM packets (attempt {retry_count}/{max_retries}): {str(e)}")
+            if retry_count < max_retries:
+                logging.info("Retrying capture...")
+                continue
+            else:
+                logging.error("Max retries reached. Giving up.")
+                raise
+        finally:
+            # Properly close the capture in the finally block
+            if capture is not None:
+                try:
+                    capture.close()
+                except Exception as e:
+                    logging.error(f"Error closing capture: {str(e)}")
     
-    logging.info(f"Found {len(extracted_data)} NTLM entries")
     return extracted_data
