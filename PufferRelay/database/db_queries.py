@@ -113,6 +113,18 @@ def insert_into_database(protocol, data):
                 VALUES (?, ?, ?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} NetBIOS records")
+        elif protocol == "imap":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO imap_requests (source_ip, destination_ip, username, password)
+                VALUES (?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} IMAP records")
+        elif protocol == "pop3":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO pop3_requests (source_ip, destination_ip, username, password)
+                VALUES (?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} POP3 records")
 
         conn.commit()
     except sqlite3.Error as e:
@@ -384,7 +396,9 @@ def fetch_all_data(conn):
         ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP"),
         ("ntlm_requests", ["source_ip", "destination_ip", "username", "ntlm_hash"], "NTLM"),
         ("ip_requests", ["subnet", "ip"], "IP"),
-        ("netbios_requests", ["domain_workgroup", "hostname", "ip", "mac"], "NetBIOS")
+        ("netbios_requests", ["domain_workgroup", "hostname", "ip", "mac"], "NetBIOS"),
+        ("imap_requests", ["source_ip", "destination_ip", "username", "password"], "IMAP"),
+        ("pop3_requests", ["source_ip", "destination_ip", "username", "password"], "POP3")
     ]
 
     # First, display unique IP pairs with Basic Auth credentials

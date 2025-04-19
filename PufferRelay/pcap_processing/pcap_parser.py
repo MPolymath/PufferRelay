@@ -18,7 +18,7 @@
 # Credits: Portions of this code were adapted from PCredz (https://github.com/lgandx/PCredz)
 #         (c) Laurent Gaffie GNU General Public License v3.0.
 
-from PufferRelay.protocols import process_ldap, process_http, process_ftp, process_telnet, process_smtp, process_ips, process_ntlm, process_netbios
+from PufferRelay.protocols import process_ldap, process_http, process_ftp, process_telnet, process_smtp, process_ips, process_ntlm, process_netbios, process_imap, process_pop3
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
 import threading
@@ -64,6 +64,8 @@ def parse_pcap(pcap_file):
         ntlm_data = process_ntlm(pcap_file)
         ip_data = process_ips(pcap_file)
         netbios_data = process_netbios(pcap_file)
+        imap_data = process_imap(pcap_file)
+        pop3_data = process_pop3(pcap_file)
 
         # Stop animation if it was started
         if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
@@ -79,7 +81,9 @@ def parse_pcap(pcap_file):
             "smtp": smtp_data,
             "ntlm": ntlm_data,
             "ips": ip_data,
-            "netbios": netbios_data
+            "netbios": netbios_data,
+            "imap": imap_data,
+            "pop3": pop3_data
         }
     except Exception as e:
         # Stop animation if it was started

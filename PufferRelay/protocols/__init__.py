@@ -26,3 +26,5 @@ from .smtp_handler import process_smtp
 from .ip_handler import process_ips
 from .ntlm_handler import process_ntlm
 from .netbios_handler import process_netbios
+from .imap_handler import process_imap
+from .pop3_handler import process_pop3

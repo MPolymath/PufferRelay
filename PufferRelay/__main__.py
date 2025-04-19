@@ -38,6 +38,10 @@ def main():
     )
     logging.info("Starting PufferRelay...")
 
+    # Configure pyshark logging
+    pyshark_logger = logging.getLogger('FileCapture')
+    pyshark_logger.setLevel(getattr(logging, LOG_LEVEL))
+
     parser = argparse.ArgumentParser(description="Analyze a PCAP file and extract network traffic data.")
     parser.add_argument("-f", "--file", help="Path to the PCAP file")
     parser.add_argument("-r", "--read-db", action="store_true", help="Read and display data from the database")
