@@ -6,9 +6,11 @@ network_capture_telnet.pcapng
 network_capture_netbios.pcapng
 network_capture_ntlm.pcapng
 extracted_data.db
+*.db
 Code-structure
 network_capture_*.pcapng
 __pycache__/
 pufferrelay.egg-info
 dist
+.vscode
 *.py[cod]
