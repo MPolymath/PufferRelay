@@ -167,18 +167,6 @@ def create_database():
             )
         """)
 
-        # Create SQLnet requests table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS sqlnet_requests (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_ip TEXT,
-                destination_ip TEXT,
-                username TEXT,
-                password TEXT,
-                UNIQUE(source_ip, destination_ip, username, password)
-            )
-        """)
-
         # Create Quick Win table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS quick_win (
@@ -199,8 +187,7 @@ def create_database():
             'ldap_requests', 'http_requests', 'ftp_requests', 
             'telnet_requests', 'smtp_requests', 'ip_requests', 
             'ntlm_requests', 'netbios_requests', 'imap_requests',
-            'pop3_requests', 'snmp_requests', 'sqlnet_requests',
-            'quick_win'
+            'pop3_requests', 'snmp_requests', 'quick_win'
         }
         created_tables = {table[0] for table in tables}
         
