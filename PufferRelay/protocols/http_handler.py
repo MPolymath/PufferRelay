@@ -83,7 +83,7 @@ def process_http(pcap_file):
     
     # Open the capture file with filters for HTTP POST and basic auth
     capture = pyshark.FileCapture(pcap_file, display_filter="http && (http.request.method==POST || http.authorization)")
-    capture.set_debug 
+
     extracted_data = []
     
     for packet in capture:

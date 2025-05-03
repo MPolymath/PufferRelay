@@ -41,7 +41,6 @@ def process_ips(pcap_file):
             include_raw=True,  # Include raw packet data
             debug=True  # Enable debug mode
         )
-        capture.set_debug()
         
         unique_ips = set()
         

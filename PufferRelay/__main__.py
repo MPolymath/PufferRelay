@@ -45,6 +45,7 @@ def main():
     parser = argparse.ArgumentParser(description="Analyze a PCAP file and extract network traffic data.")
     parser.add_argument("-f", "--file", help="Path to the PCAP file")
     parser.add_argument("-r", "--read-db", action="store_true", help="Read and display data from the database")
+    parser.add_argument("-q", "--quick", action="store_true", help="Quick summary of unencrypted protocols found")
     parser.add_argument("--log-level", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'], 
                        default=LOG_LEVEL, help="Set the logging level")
 
@@ -54,6 +55,18 @@ def main():
     if args.log_level != LOG_LEVEL:
         logging.getLogger().setLevel(getattr(logging, args.log_level))
         logging.info(f"Logging level set to {args.log_level}")
+
+    # If quick summary requested
+    if args.quick:
+        logging.info(f"Generating quick summary from database: {DB_NAME}")
+        conn = get_db_connection()
+        if not conn:
+            logging.error("Failed to connect to database")
+            return
+        
+        display_quick_win_summary(conn)
+        close_connection(conn)
+        return
 
     # If reading from database
     if args.read_db:

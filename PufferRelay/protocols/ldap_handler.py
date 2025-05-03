@@ -26,7 +26,7 @@ def process_ldap(pcap_file):
     
     # Open the capture file with a filter for LDAP Bind Requests
     capture = pyshark.FileCapture(pcap_file, display_filter="ldap && ldap.protocolOp==bindRequest")
-    capture.set_debug 
+
     extracted_data = []
     
     for packet in capture:

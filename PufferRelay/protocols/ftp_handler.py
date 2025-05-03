@@ -27,12 +27,8 @@ def process_ftp(pcap_file):
         # Open the capture file with a filter for FTP Requests
         capture = pyshark.FileCapture(
             pcap_file,
-            display_filter="ftp && (ftp.request.command==USER || ftp.request.command==PASS)",
-            use_json=True,  # Use JSON output for better stability
-            include_raw=True,  # Include raw packet data
-            debug=True  # Enable debug mode
+            display_filter="ftp && (ftp.request.command==USER || ftp.request.command==PASS)"
         )
-        capture.set_debug()
         
         extracted_data = []
         for packet in capture:
@@ -45,7 +41,6 @@ def process_ftp(pcap_file):
                 ftp_request_arg = packet.ftp.get('ftp.request.arg', 'N/A') if hasattr(packet, 'ftp') else "N/A"  # Get argument
                 
                 extracted_data.append((src_ip, dst_ip, ftp_request_command, ftp_request_arg))
-          
             except AttributeError:
                 continue  # Skip packets that don't have the expected attributes
 

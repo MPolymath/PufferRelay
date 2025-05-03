@@ -120,12 +120,9 @@ async def process_ntlm_async(pcap_file):
                 pcap_file,
                 display_filter="tcp",
                 use_json=True,  # Use JSON output for better stability
-                include_raw=True,  # Include raw packet data
-                debug=True  # Enable debug mode
+                include_raw=True
             )
             
-            # Enable debug mode for TShark
-            capture.set_debug()
             
             # Dictionary to store challenges by source-destination IP pair
             challenges = {}
@@ -305,12 +302,9 @@ def process_ntlm(pcap_file):
                 pcap_file,
                 display_filter="tcp",
                 use_json=True,  # Use JSON output for better stability
-                include_raw=True,  # Include raw packet data
-                debug=True  # Enable debug mode
+                include_raw=True
             )
             
-            # Enable debug mode for TShark
-            capture.set_debug()
             
             # Dictionary to store challenges by source-destination IP pair
             challenges = {}

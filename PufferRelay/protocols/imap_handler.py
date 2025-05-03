@@ -41,7 +41,6 @@ def process_imap(pcap_file):
             include_raw=True,  # Include raw packet data
             debug=True  # Enable debug mode
         )
-        capture.set_debug()
         
         extracted_data = []
         

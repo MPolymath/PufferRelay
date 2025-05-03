@@ -125,6 +125,12 @@ def insert_into_database(protocol, data):
                 VALUES (?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} POP3 records")
+        elif protocol == "snmp":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO snmp_requests (source_ip, destination_ip, community_string)
+                VALUES (?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} SNMP records")
 
         conn.commit()
     except sqlite3.Error as e:
@@ -378,130 +384,267 @@ def display_table(data, headers, protocol):
     console.print()
 
 def fetch_all_data(conn):
-    """
-    Fetch and display LDAP, HTTP, FTP, TELNET, SMTP, IP, NTLM, and NetBIOS data from the database.
+    """Fetch and display all data from the database"""
+    try:
+        if not conn:
+            logging.error("No database connection available")
+            return
 
+        console = Console()
+        terminal_width = get_terminal_width()
+
+        # First check if we have any FTP data
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM ftp_requests")
+        ftp_count = cursor.fetchone()[0]
+        logging.debug(f"Total FTP records in database: {ftp_count}")
+
+        if ftp_count > 0:
+            # Get FTP credentials grouped by source and destination IP pairs
+            cursor.execute("""
+                WITH user_pass_pairs AS (
+                    SELECT 
+                        source_ip as src_ip,
+                        destination_ip as dst_ip,
+                        GROUP_CONCAT(CASE WHEN ftp_request_command = 'USER' THEN ftp_request_arg END) as usernames,
+                        GROUP_CONCAT(CASE WHEN ftp_request_command = 'PASS' THEN ftp_request_arg END) as passwords
+                    FROM ftp_requests
+                    GROUP BY source_ip, destination_ip
+                    HAVING usernames IS NOT NULL OR passwords IS NOT NULL
+                )
+                SELECT 
+                    src_ip,
+                    dst_ip,
+                    usernames,
+                    passwords
+                FROM user_pass_pairs
+                ORDER BY src_ip, dst_ip
+            """)
+            
+            ftp_results = cursor.fetchall()
+            logging.debug(f"Found {len(ftp_results)} FTP credential pairs")
+            
+            if ftp_results:
+                table = Table(title="FTP Credentials", width=terminal_width)
+                table.add_column("Source IP", style="magenta")
+                table.add_column("Destination IP", style="magenta")
+                table.add_column("Username", style="yellow")
+                table.add_column("Password", style="red")
+                
+                for src_ip, dst_ip, usernames, passwords in ftp_results:
+                    # Split the usernames and passwords into lists
+                    username_list = usernames.split(',') if usernames else []
+                    password_list = passwords.split(',') if passwords else []
+                    
+                    # Display each pair on its own line
+                    for i in range(max(len(username_list), len(password_list))):
+                        username = username_list[i] if i < len(username_list) else "N/A"
+                        password = password_list[i] if i < len(password_list) else "N/A"
+                        table.add_row(src_ip, dst_ip, username, password)
+                
+                console.print(table)
+            else:
+                logging.warning("No FTP credentials found in database")
+                # Show raw data for debugging
+                cursor.execute("SELECT * FROM ftp_requests ORDER BY source_ip, destination_ip")
+                raw_data = cursor.fetchall()
+                logging.debug("Raw FTP data:")
+                for row in raw_data:
+                    logging.debug(row)
+        else:
+            logging.warning("No FTP records found in database")
+
+        # Display IP data
+        cursor.execute("SELECT DISTINCT subnet, GROUP_CONCAT(ip, '\n') FROM ip_requests GROUP BY subnet ORDER BY subnet")
+        ip_data = cursor.fetchall()
+        if ip_data:
+            table = Table(title="IP Data", width=terminal_width)
+            table.add_column("Subnet", style="cyan")
+            table.add_column("IPs", style="cyan")
+            
+            for subnet, ips in ip_data:
+                table.add_row(subnet, ips)
+            
+            console.print(table)
+
+        # Display other protocol data
+        requests = [
+            ("ldap_requests", ["source_ip", "destination_ip", "ldap_name", "ldap_simple"], "LDAP"),
+            ("http_requests", ["source_ip", "destination_ip", "http_url", "http_form", "http_auth_username", "http_auth_password"], "HTTP"),
+            ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"], "TELNET"),
+            ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP"),
+            ("ntlm_requests", ["source_ip", "destination_ip", "username", "ntlm_hash"], "NTLM"),
+            ("netbios_requests", ["domain_workgroup", "hostname", "ip", "mac"], "NetBIOS"),
+            ("imap_requests", ["source_ip", "destination_ip", "username", "password"], "IMAP"),
+            ("pop3_requests", ["source_ip", "destination_ip", "username", "password"], "POP3"),
+            ("snmp_requests", ["source_ip", "destination_ip", "community_string"], "SNMP")
+        ]
+
+        for request in requests:
+            table_name, columns, protocol, *conditions = request
+            if protocol == "NetBIOS":
+                # Special handling for NetBIOS data
+                cursor.execute("""
+                    SELECT 
+                        CASE 
+                            WHEN domain_workgroup != 'N/A' THEN domain_workgroup
+                            WHEN hostname != 'N/A' THEN hostname
+                            ELSE other_service
+                        END as identifier,
+                        src_ip,
+                        src_mac,
+                        service_type
+                    FROM netbios_requests 
+                    ORDER BY identifier, service_type
+                """)
+                data = cursor.fetchall()
+                headers = ["Identifier", "Source IP", "Source MAC", "Service Type"]
+            else:
+                data = fetch_requests(conn, table_name, columns, protocol, *conditions)
+                headers = ["Protocol"] + [col.replace("_", " ").title() for col in columns]
+            display_table(data, headers, protocol)
+
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error: {str(e)}")
+        raise
+
+def check_unencrypted_protocols(conn):
+    """
+    Check for unencrypted protocols in the database and return a summary.
+    
     Args:
         conn (sqlite3.Connection): Active database connection.
+        
+    Returns:
+        list: List of unencrypted protocols found with their counts
     """
     if not conn:
         logging.error("Database connection is not available.")
-        return
+        return []
 
-    requests = [
-        ("ldap_requests", ["source_ip", "destination_ip", "ldap_name", "ldap_simple"], "LDAP"),
-        ("http_requests", ["source_ip", "destination_ip", "http_url", "http_form", "http_auth_username", "http_auth_password"], "HTTP"),
-        ("ftp_requests", ["source_ip", "destination_ip", "ftp_request_command", "ftp_request_arg"], "FTP", "ftp_request_command IN ('USER', 'PASS')"),
-        ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"], "TELNET"),
-        ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP"),
-        ("ntlm_requests", ["source_ip", "destination_ip", "username", "ntlm_hash"], "NTLM"),
-        ("ip_requests", ["subnet", "ip"], "IP"),
-        ("netbios_requests", ["domain_workgroup", "hostname", "ip", "mac"], "NetBIOS"),
-        ("imap_requests", ["source_ip", "destination_ip", "username", "password"], "IMAP"),
-        ("pop3_requests", ["source_ip", "destination_ip", "username", "password"], "POP3")
-    ]
+    # Define unencrypted protocols and their tables
+    unencrypted_protocols = {
+        "FTP": "ftp_requests",
+        "Telnet": "telnet_requests",
+        "SNMP": "snmp_requests",
+        "IMAP": "imap_requests",
+        "POP3": "pop3_requests",
+        "SMTP": "smtp_requests",
+        "LDAP": "ldap_requests",
+        "HTTP": "http_requests",
+        "NTLM": "ntlm_requests"
+    }
 
-    # First, display unique IP pairs with Basic Auth credentials
+    found_protocols = []
+    cursor = conn.cursor()
+
+    for protocol, table in unencrypted_protocols.items():
+        try:
+            # Check if table exists
+            cursor.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table}'")
+            if not cursor.fetchone():
+                continue
+
+            # Count entries in the table
+            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            count = cursor.fetchone()[0]
+            
+            if count > 0:
+                found_protocols.append((protocol, count))
+        except sqlite3.Error as e:
+            logging.error(f"Error checking {protocol} table: {e}")
+            continue
+
+    return found_protocols
+
+def update_quick_win(protocol, count):
+    """
+    Update the quick win table with protocol count.
+    
+    Args:
+        protocol (str): Name of the protocol
+        count (int): Number of instances found
+    """
+    conn = None
     try:
+        conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Check if the http_requests table exists
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='http_requests'")
-        if not cursor.fetchone():
-            logging.warning("http_requests table does not exist in the database.")
-        else:
-            # Check if the table has the required columns
-            cursor.execute("PRAGMA table_info(http_requests)")
-            columns = [col[1] for col in cursor.fetchall()]
-            required_columns = {'http_auth_username', 'http_auth_password'}
-            if not all(col in columns for col in required_columns):
-                logging.warning("http_requests table is missing required columns for Basic Auth.")
-            else:
-                # Query for Basic Auth credentials
-                cursor.execute("""
-                    SELECT DISTINCT source_ip, destination_ip, http_auth_username, http_auth_password 
-                    FROM http_requests 
-                    WHERE http_auth_username != 'N/A' AND http_auth_password != 'N/A'
-                    ORDER BY source_ip, destination_ip
-                """)
-                auth_data = cursor.fetchall()
-                
-                if auth_data:
-                    # Create a Rich table for Basic Auth credentials
-                    table = Table(
-                        title="HTTP Basic Authentication Credentials by IP Pair",
-                        show_header=True,
-                        header_style="bold magenta",
-                        expand=False,
-                        show_lines=True,
-                        box=rich.box.ROUNDED,
-                        padding=(0, 1)
-                    )
-                    
-                    # Add columns with fixed widths
-                    table.add_column("Source IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
-                    table.add_column("Destination IP", style="cyan", no_wrap=True, overflow="fold", width=15, justify="left")
-                    table.add_column("Username", style="cyan", no_wrap=False, overflow="fold", min_width=15, max_width=40, justify="left")
-                    table.add_column("Password", style="cyan", no_wrap=False, overflow="fold", min_width=15, max_width=40, justify="left")
-                    
-                    # Group credentials by IP pair
-                    ip_pairs = {}
-                    for src_ip, dst_ip, username, password in auth_data:
-                        key = (src_ip, dst_ip)
-                        if key not in ip_pairs:
-                            ip_pairs[key] = []
-                        ip_pairs[key].append((username, password))
-                    
-                    # Add data to the table
-                    for (src_ip, dst_ip), creds in ip_pairs.items():
-                        table.add_row(
-                            src_ip,
-                            dst_ip,
-                            "\n".join(cred[0] for cred in creds),
-                            "\n".join(cred[1] for cred in creds)
-                        )
-                    
-                    # Print the table
-                    console = Console(
-                        width=None,
-                        force_terminal=True,
-                        color_system="auto",
-                        soft_wrap=True
-                    )
-                    console.print("\nHTTP Basic Authentication Credentials by IP Pair:")
-                    console.print(table)
-                    console.print("=" * get_terminal_width())
+        # Insert or update the protocol count
+        cursor.execute("""
+            INSERT INTO quick_win (protocol, count)
+            VALUES (?, ?)
+            ON CONFLICT(protocol) DO UPDATE SET count = count + ?
+        """, (protocol, count, count))
+        
+        conn.commit()
     except sqlite3.Error as e:
-        logging.error(f"Error fetching HTTP Basic Auth data: {e}")
+        logging.error(f"Error updating quick win table: {e}")
+    finally:
+        if conn:
+            conn.close()
 
-    # Then display other protocol data
-    for request in requests:
-        table_name, columns, protocol, *conditions = request
-        if protocol == "IP":
-            # Special handling for IP data
-            cursor = conn.cursor()
-            cursor.execute("SELECT DISTINCT subnet, GROUP_CONCAT(ip, '\n') FROM ip_requests GROUP BY subnet ORDER BY subnet")
-            data = cursor.fetchall()
-            headers = ["Subnet", "IPs"]
-        elif protocol == "NetBIOS":
-            # Special handling for NetBIOS data
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT 
-                    CASE 
-                        WHEN domain_workgroup != 'N/A' THEN domain_workgroup
-                        WHEN hostname != 'N/A' THEN hostname
-                        ELSE other_service
-                    END as identifier,
-                    src_ip,
-                    src_mac,
-                    service_type
-                FROM netbios_requests 
-                ORDER BY identifier, service_type
-            """)
-            data = cursor.fetchall()
-            headers = ["Identifier", "Source IP", "Source MAC", "Service Type"]
-        else:
-            data = fetch_requests(conn, table_name, columns, protocol, *conditions)
-            headers = ["Protocol"] + [col.replace("_", " ").title() for col in columns]
-        display_table(data, headers, protocol)
+def get_quick_win_summary(conn):
+    """
+    Get a summary of unencrypted protocols from the quick win table.
+    
+    Args:
+        conn (sqlite3.Connection): Active database connection.
+        
+    Returns:
+        list: List of tuples containing (protocol, count)
+    """
+    if not conn:
+        logging.error("Database connection is not available.")
+        return []
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT protocol, count FROM quick_win ORDER BY protocol")
+        return cursor.fetchall()
+    except sqlite3.Error as e:
+        logging.error(f"Error fetching quick win summary: {e}")
+        return []
+
+def display_quick_win_summary(conn):
+    """
+    Display the quick win summary in a table format.
+    
+    Args:
+        conn (sqlite3.Connection): Active database connection.
+    """
+    protocols = get_quick_win_summary(conn)
+    
+    if not protocols:
+        print("\nNo unencrypted protocols were found in the database.")
+        return
+        
+    # Create a Rich table
+    table = Table(
+        title="Unencrypted Protocols Found",
+        show_header=True,
+        header_style="bold magenta",
+        expand=False,
+        show_lines=True,
+        box=rich.box.ROUNDED,
+        padding=(0, 1)
+    )
+    
+    # Add columns
+    table.add_column("Protocol", style="cyan", no_wrap=True, width=15)
+    table.add_column("Instances", style="cyan", no_wrap=True, width=10)
+    
+    # Add data
+    for protocol, count in protocols:
+        table.add_row(protocol, str(count))
+    
+    # Print the table
+    console = Console(
+        width=None,
+        force_terminal=True,
+        color_system="auto",
+        soft_wrap=True
+    )
+    console.print("\nUnencrypted protocols were found:")
+    console.print(table)
+    console.print()
