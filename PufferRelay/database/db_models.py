@@ -156,6 +156,39 @@ def create_database():
             )
         """)
 
+        # Create SNMP requests table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS snmp_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_ip TEXT,
+                destination_ip TEXT,
+                community_string TEXT,
+                UNIQUE(source_ip, destination_ip, community_string)
+            )
+        """)
+
+        # Create SQLnet requests table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sqlnet_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_ip TEXT,
+                destination_ip TEXT,
+                username TEXT,
+                password TEXT,
+                UNIQUE(source_ip, destination_ip, username, password)
+            )
+        """)
+
+        # Create Quick Win table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS quick_win (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                protocol TEXT,
+                count INTEGER,
+                UNIQUE(protocol)
+            )
+        """)
+
         # Set the schema version
         set_db_schema_version(conn)
 
@@ -166,7 +199,8 @@ def create_database():
             'ldap_requests', 'http_requests', 'ftp_requests', 
             'telnet_requests', 'smtp_requests', 'ip_requests', 
             'ntlm_requests', 'netbios_requests', 'imap_requests',
-            'pop3_requests'
+            'pop3_requests', 'snmp_requests', 'sqlnet_requests',
+            'quick_win'
         }
         created_tables = {table[0] for table in tables}
         

@@ -37,10 +37,8 @@ def process_pop3(pcap_file):
             pcap_file,
             display_filter="pop && (pop.request.command==USER || pop.request.command==PASS || pop.request.command==APOP)",
             use_json=True,  # Use JSON output for better stability
-            include_raw=True,  # Include raw packet data
-            debug=True  # Enable debug mode
+            include_raw=True
         )
-        capture.set_debug()
         
         extracted_data = []
         temp_credentials = {}  # Store temporary credentials by IP pair

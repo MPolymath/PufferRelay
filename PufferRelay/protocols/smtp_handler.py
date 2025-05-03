@@ -26,7 +26,6 @@ def process_smtp(pcap_file):
     
     # Open the capture file with a filter for SMTP Requests
     capture = pyshark.FileCapture(pcap_file, display_filter="smtp.auth.password || smtp.auth.username")
-    capture.set_debug 
     extracted_data = []
 
     for packet in capture:
