@@ -43,6 +43,9 @@ pufferrelay -r
 ### 🐛 DEBUG
 pufferrelay -f {filename} --log-level DEBUG
 
+### ⚡ QUICKWIN
+pufferrelay -q {filename}
+
 ### Documentation
 The <a href="https://mpolymath.gitbook.io/pufferrelay">Wiki</a> is under construction but will be available soon !
 
