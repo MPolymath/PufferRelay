@@ -21,7 +21,9 @@
 from PufferRelay.core_imports import (
     sys,
     time,
-    shutil
+    shutil,
+    threading,
+    os
 )
 
 def get_terminal_width():
@@ -38,6 +40,7 @@ def show_loading_animation():
     """
     width = get_terminal_width()
     fish_frames = ['><>', '<><']  # Simple fish animation frames
+    lightning_frames = ['⚡', '⚡']  # Simple lightning animation frames
     loading_text = "Loading"
     dots = ""
     position = 0
@@ -48,16 +51,32 @@ def show_loading_animation():
     sys.stdout.write("\033[2J")    # Clear screen
     sys.stdout.write("\033[H")     # Move to top
     
-    def show_ready():
-        """Show the Ready message in purple ASCII art."""
-        # Clear screen and show Ready message
+    def show_ready(quick_wins=False):
+        """Show the Ready message in purple ASCII art or Quick Wins banner in yellow."""
+        # Clear screen and show message
         sys.stdout.write("\033[2J")    # Clear screen
         sys.stdout.write("\033[H")     # Move to top
         sys.stdout.flush()             # Ensure screen is cleared
         time.sleep(0.1)                # Small delay to ensure clear
         
-        # Show Ready message in purple ASCII art
-        ready_art = """
+        if quick_wins:
+            # Show Quick Wins banner in yellow ASCII art
+            quick_wins_art = """
+\033[33m
+⚡ ⚡ ⚡ Quick Wins Mode ⚡ ⚡ ⚡
+
+ ██████╗ ██╗   ██╗██╗ ██████╗██╗  ██╗    ██╗    ██╗██╗███╗   ██╗███████╗
+██╔═══██╗██║   ██║██║██╔════╝██║ ██╔╝    ██║    ██║██║████╗  ██║██╔════╝
+██║   ██║██║   ██║██║██║     █████╔╝     ██║ █╗ ██║██║██╔██╗ ██║███████╗
+██║▄▄ ██║██║   ██║██║██║     ██╔═██╗     ██║███╗██║██║██║╚██╗██║╚════██║
+╚██████╔╝╚██████╔╝██║╚██████╗██║  ██╗    ╚███╔███╔╝██║██║ ╚████║███████║
+ ╚══▀▀═╝  ╚═════╝ ╚═╝ ╚═════╝╚═╝  ╚═╝     ╚══╝╚══╝ ╚═╝╚═╝  ╚═══╝╚══════╝
+\033[0m
+"""
+            print(quick_wins_art)
+        else:
+            # Show Ready message in purple ASCII art
+            ready_art = """
 \033[35m
 ██████╗ ███████╗ █████╗ ██████╗ ██╗   ██╗
 ██╔══██╗██╔════╝██╔══██╗██╔══██╗╚██╗ ██╔╝
@@ -67,17 +86,18 @@ def show_loading_animation():
 ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═════╝    ╚═╝   
 \033[0m
 """
-        print(ready_art)
+            print(ready_art)
+        
         sys.stdout.write("\033[?25h")  # Show cursor
         sys.stdout.flush()
     
-    def update_animation():
+    def update_animation(quick_wins=False):
         """Update the animation frame."""
         nonlocal position, direction, dots
         
-        # Calculate fish position
+        # Calculate position
         position += direction
-        if position >= width - 3:  # Fish width is 3
+        if position >= width - 3:  # Animation width is 3
             direction = -1
         elif position <= 0:
             direction = 1
@@ -89,8 +109,13 @@ def show_loading_animation():
         sys.stdout.write("\033[2K")  # Clear line
         sys.stdout.write("\033[H")   # Move to top
         
-        # Print three lines
-        print(f"{' ' * position}{fish_frames[int(time.time() * 2) % 2]}")
+        if quick_wins:
+            # Print lightning animation in yellow
+            print("\033[33m" + f"{' ' * position}{lightning_frames[int(time.time() * 2) % 2]}" + "\033[0m")
+        else:
+            # Print fish animation in purple
+            print("\033[35m" + f"{' ' * position}{fish_frames[int(time.time() * 2) % 2]}" + "\033[0m")
+        
         print(f"{loading_text}{dots}")
         print("=" * width)
         

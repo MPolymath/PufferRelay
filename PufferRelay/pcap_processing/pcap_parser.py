@@ -39,7 +39,7 @@ def parse_pcap(pcap_file):
     # Only show loading animation if not in debug mode
     if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
         # Initialize loading animation
-        update_animation, show_ready = show_loading_animation()
+        update_animation, _ = show_loading_animation()
         animation_running = True
 
         def animation_loop():
@@ -72,7 +72,6 @@ def parse_pcap(pcap_file):
         if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
             animation_running = False
             animation_thread.join()
-            show_ready()
 
         return {
             "ldap": ldap_data,

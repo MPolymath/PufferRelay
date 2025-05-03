@@ -28,7 +28,7 @@ def create_database():
     # Check database version first
     if not check_database_version():
         logging.error("Database version check failed. Exiting.")
-        return False
+        return None
         
     conn = None
     try:
@@ -124,11 +124,9 @@ def create_database():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 domain_workgroup TEXT,
                 hostname TEXT,
-                other_service TEXT,
-                src_ip TEXT,
-                src_mac TEXT,
-                service_type TEXT,
-                UNIQUE(domain_workgroup, hostname, other_service, src_ip, src_mac, service_type)
+                ip TEXT,
+                mac TEXT,
+                UNIQUE(domain_workgroup, hostname, ip, mac)
             )
         """)
 
@@ -167,15 +165,51 @@ def create_database():
             )
         """)
 
-        # Create Quick Win table
+        # Create Quick Wins table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS quick_win (
+            CREATE TABLE IF NOT EXISTS quick_wins (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                protocol TEXT,
-                count INTEGER,
-                UNIQUE(protocol)
+                protocol TEXT UNIQUE,
+                found BOOLEAN DEFAULT FALSE,
+                details TEXT,
+                credentials_found BOOLEAN DEFAULT FALSE,
+                credential_protocols TEXT
             )
         """)
+
+        # Initialize Quick Wins table with all protocols
+        protocols = [
+            # Unencrypted protocols
+            ('LDAP', False, '', False, ''),
+            ('HTTP', False, '', False, ''),
+            ('FTP', False, '', False, ''),
+            ('TELNET', False, '', False, ''),
+            ('SMTP', False, '', False, ''),
+            ('IMAP', False, '', False, ''),
+            ('POP3', False, '', False, ''),
+            ('SYSLOG', False, '', False, ''),
+            ('TFTP', False, '', False, ''),
+            # Deprecated protocols
+            ('SNMPv1', False, '', False, ''),
+            ('SNMPv2', False, '', False, ''),
+            ('SMBv1', False, '', False, ''),
+            ('TLS1.0', False, '', False, ''),
+            ('SSLv2', False, '', False, ''),
+            ('SSLv3', False, '', False, ''),
+            # Multicast protocols
+            ('LLMNR', False, '', False, ''),
+            ('NETBIOS', False, '', False, ''),
+            ('MDNS', False, '', False, ''),
+            # Security issues
+            ('LDAP_SIGNING_MISSING', False, '', False, ''),
+            ('LDAP_SIGNING_ENFORCED', False, '', False, ''),
+            ('SMB_SIGNING_MISSING', False, '', False, '')
+        ]
+        
+        cursor.executemany("""
+            INSERT OR IGNORE INTO quick_wins (protocol, found, details, credentials_found, credential_protocols)
+            VALUES (?, ?, ?, ?, ?)
+        """, protocols)
 
         # Set the schema version
         set_db_schema_version(conn)
@@ -183,25 +217,20 @@ def create_database():
         # Verify all tables were created
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = cursor.fetchall()
-        required_tables = {
-            'ldap_requests', 'http_requests', 'ftp_requests', 
-            'telnet_requests', 'smtp_requests', 'ip_requests', 
-            'ntlm_requests', 'netbios_requests', 'imap_requests',
-            'pop3_requests', 'snmp_requests', 'quick_win'
-        }
-        created_tables = {table[0] for table in tables}
         
-        if not required_tables.issubset(created_tables):
-            missing_tables = required_tables - created_tables
-            logging.error(f"Failed to create the following tables: {missing_tables}")
-            raise sqlite3.OperationalError(f"Missing tables: {missing_tables}")
+        if not tables:
+            logging.error("No tables were created in the database")
+            return None
+            
+        return conn
 
-        conn.commit()
-        logging.info("Database and all tables created successfully")
-        return True
     except sqlite3.Error as e:
-        logging.error(f"Database error: {e}")
-        return False
-    finally:
+        logging.error(f"Database error: {str(e)}")
         if conn:
             conn.close()
+        return None
+    except Exception as e:
+        logging.error(f"Unexpected error while creating database: {str(e)}")
+        if conn:
+            conn.close()
+        return None

@@ -2,6 +2,7 @@ import logging
 import sys
 from logging.handlers import RotatingFileHandler
 import os
+from PufferRelay.config import LOG_LEVEL
 
 class PysharkFilter(logging.Filter):
     def filter(self, record):
@@ -10,15 +11,35 @@ class PysharkFilter(logging.Filter):
             return False
         return True
 
-def setup_logger():
-    """Setup logging configuration"""
+def setup_logger(log_level=None):
+    """
+    Set up the logging configuration.
+    
+    Args:
+        log_level (int, optional): The logging level to use. If None, uses the default from config.
+    """
+    # Use provided log level or default from config
+    level = log_level if log_level is not None else getattr(logging, LOG_LEVEL)
+    
+    # Configure logging
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    
+    # Configure pyshark logging
+    pyshark_logger = logging.getLogger('FileCapture')
+    pyshark_logger.setLevel(level)
+    
+    logging.info("Starting PufferRelay...")
+
     # Create logs directory if it doesn't exist
     if not os.path.exists('logs'):
         os.makedirs('logs')
 
     # Configure root logger
     root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(level)
 
     # Suppress pyshark debug messages
     logging.getLogger('pyshark').setLevel(logging.WARNING)

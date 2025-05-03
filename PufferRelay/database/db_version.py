@@ -48,56 +48,32 @@ def get_db_schema_version(conn):
         return 0
 
 def check_database_version():
-    """
-    Check if the database exists and has the correct schema version.
-    Returns True if the database can be used, False if it should be recreated.
-    
-    Returns:
-        bool: True if database is ready to use, False if program should exit
-    """
-    if not os.path.exists(DB_NAME):
-        return True  # No existing database, can create new one
-    
+    """Check if the database schema version matches the current version."""
     try:
         conn = sqlite3.connect(DB_NAME)
-        current_version = get_db_schema_version(conn)
+        cursor = conn.cursor()
         
-        if current_version == CURRENT_SCHEMA_VERSION:
-            logging.info("Database schema version matches current version")
+        # Check if version table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_version'")
+        if not cursor.fetchone():
+            # Create version table if it doesn't exist
+            cursor.execute("CREATE TABLE schema_version (version TEXT)")
+            cursor.execute("INSERT INTO schema_version (version) VALUES (?)", (CURRENT_SCHEMA_VERSION,))
+            conn.commit()
             return True
-            
-        logging.warning(f"Database schema version mismatch. Current: {current_version}, Required: {CURRENT_SCHEMA_VERSION}")
         
-        # Ask user what to do
-        while True:
-            response = input("Database schema version mismatch. Would you like to:\n"
-                           "1. Delete the old database and create a new one\n"
-                           "2. Move the old database to a backup file\n"
-                           "3. Exit the program\n"
-                           "Enter your choice (1-3): ")
+        # Get current version
+        cursor.execute("SELECT version FROM schema_version")
+        current_version = cursor.fetchone()[0]
+        
+        # Return True if versions match, False if they don't
+        return str(current_version) == str(CURRENT_SCHEMA_VERSION)
             
-            if response == "1":
-                conn.close()
-                os.remove(DB_NAME)
-                logging.info("Old database deleted")
-                return True
-            elif response == "2":
-                backup_name = f"{DB_NAME}.v{current_version}.bak"
-                conn.close()
-                os.rename(DB_NAME, backup_name)
-                logging.info(f"Old database moved to {backup_name}")
-                return True
-            elif response == "3":
-                logging.info("Exiting program as requested")
-                return False
-            else:
-                print("Invalid choice. Please enter 1, 2, or 3.")
-                
     except sqlite3.Error as e:
-        logging.error(f"Error checking database version: {e}")
+        logging.error(f"Database version check error: {str(e)}")
         return False
     finally:
-        if 'conn' in locals():
+        if conn:
             conn.close()
 
 def set_db_schema_version(conn):

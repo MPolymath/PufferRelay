@@ -489,16 +489,16 @@ def fetch_all_data(conn):
                         CASE 
                             WHEN domain_workgroup != 'N/A' THEN domain_workgroup
                             WHEN hostname != 'N/A' THEN hostname
-                            ELSE other_service
+                            ELSE ip
                         END as identifier,
-                        src_ip,
-                        src_mac,
-                        service_type
+                        ip,
+                        mac,
+                        domain_workgroup
                     FROM netbios_requests 
-                    ORDER BY identifier, service_type
+                    ORDER BY identifier, domain_workgroup
                 """)
                 data = cursor.fetchall()
-                headers = ["Identifier", "Source IP", "Source MAC", "Service Type"]
+                headers = ["Identifier", "IP", "MAC", "Domain/Workgroup"]
             else:
                 data = fetch_requests(conn, table_name, columns, protocol, *conditions)
                 headers = ["Protocol"] + [col.replace("_", " ").title() for col in columns]
@@ -557,94 +557,146 @@ def check_unencrypted_protocols(conn):
 
     return found_protocols
 
-def update_quick_win(protocol, count):
+def update_quick_win(conn, protocol, found=True, details='', credentials_found=False, credential_protocols=None):
     """
-    Update the quick win table with protocol count.
+    Update a quick win entry in the database.
     
     Args:
-        protocol (str): Name of the protocol
-        count (int): Number of instances found
+        conn: Database connection
+        protocol (str): Protocol name
+        found (bool): Whether the protocol was found
+        details (str): Additional details about the finding
+        credentials_found (bool): Whether credentials were found
+        credential_protocols (list): List of protocols where credentials were found
     """
-    conn = None
     try:
-        conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         
-        # Insert or update the protocol count
-        cursor.execute("""
-            INSERT INTO quick_win (protocol, count)
-            VALUES (?, ?)
-            ON CONFLICT(protocol) DO UPDATE SET count = count + ?
-        """, (protocol, count, count))
+        # If updating credentials, we need to merge with existing credential protocols
+        if credentials_found and credential_protocols:
+            # Get existing credential protocols
+            cursor.execute("""
+                SELECT credential_protocols 
+                FROM quick_wins 
+                WHERE protocol = ?
+            """, (protocol,))
+            result = cursor.fetchone()
+            existing_protocols = set()
+            if result and result[0]:
+                existing_protocols = set(result[0].split(','))
+            
+            # Merge with new protocols
+            new_protocols = existing_protocols.union(set(credential_protocols))
+            credential_protocols_str = ','.join(sorted(new_protocols))
+            
+            cursor.execute("""
+                UPDATE quick_wins 
+                SET found = ?, details = ?, credentials_found = ?, credential_protocols = ?
+                WHERE protocol = ?
+            """, (found, details, credentials_found, credential_protocols_str, protocol))
+        else:
+            cursor.execute("""
+                UPDATE quick_wins 
+                SET found = ?, details = ?
+                WHERE protocol = ?
+            """, (found, details, protocol))
         
         conn.commit()
     except sqlite3.Error as e:
-        logging.error(f"Error updating quick win table: {e}")
-    finally:
-        if conn:
-            conn.close()
+        logging.error(f"Error updating quick win for {protocol}: {str(e)}")
+        raise
 
-def get_quick_win_summary(conn):
+def display_quick_wins(results):
     """
-    Get a summary of unencrypted protocols from the quick win table.
+    Display quick wins in a nice Rich table format.
     
     Args:
-        conn (sqlite3.Connection): Active database connection.
+        results: Either a database connection or a list of quick wins tuples
+    """
+    try:
+        # If results is a connection, fetch the data
+        if hasattr(results, 'cursor'):
+            cursor = results.cursor()
+            cursor.execute("""
+                SELECT protocol, found, details, credentials_found, credential_protocols 
+                FROM quick_wins 
+                ORDER BY 
+                    CASE 
+                        WHEN protocol IN ('LDAP', 'HTTP', 'FTP', 'TELNET', 'SMTP', 'IMAP', 'POP3', 'SYSLOG', 'TFTP') THEN 1
+                        WHEN protocol IN ('SNMPv1', 'SNMPv2', 'SMBv1', 'TLS1.0', 'SSLv2', 'SSLv3') THEN 2
+                        WHEN protocol IN ('LLMNR', 'NETBIOS', 'MDNS') THEN 3
+                        ELSE 4
+                    END,
+                    protocol
+            """)
+            results = cursor.fetchall()
+        
+        if not results:
+            logging.warning("No quick wins found to display")
+            return
+        
+        console = Console()
+        table = Table(title="Quick Wins Summary", show_header=True, header_style="bold magenta")
+        table.add_column("Category", style="cyan")
+        table.add_column("Protocol", style="cyan")
+        table.add_column("Found", style="green")
+        table.add_column("Details", style="yellow")
+        table.add_column("Credentials Found", style="red")
+        
+        current_category = ""
+        for protocol, found, details, credentials_found, credential_protocols in results:
+            # Determine category
+            if protocol in ['LDAP', 'HTTP', 'FTP', 'TELNET', 'SMTP', 'IMAP', 'POP3', 'SYSLOG', 'TFTP']:
+                category = "Unencrypted Protocols"
+            elif protocol in ['SNMPv1', 'SNMPv2', 'SMBv1', 'TLS1.0', 'SSLv2', 'SSLv3']:
+                category = "Deprecated Protocols"
+            elif protocol in ['LLMNR', 'NETBIOS', 'MDNS']:
+                category = "Multicast Protocols"
+            else:
+                category = "Security Findings"
+            
+            # Format credentials information
+            credentials_info = ""
+            if credentials_found and credential_protocols:
+                credentials_info = f"Found in: {credential_protocols}"
+            
+            # Only show category once
+            if category != current_category:
+                table.add_row(category, protocol, "✓" if found else "✗", details, credentials_info)
+                current_category = category
+            else:
+                table.add_row("", protocol, "✓" if found else "✗", details, credentials_info)
+        
+        console.print(table)
+    except Exception as e:
+        logging.error(f"Error displaying quick wins: {str(e)}")
+        raise
+
+def get_quick_wins(conn):
+    """
+    Get all quick wins from the database.
+    
+    Args:
+        conn: Database connection
         
     Returns:
-        list: List of tuples containing (protocol, count)
+        list: List of quick wins tuples (protocol, found, details, credentials_found, credential_protocols)
     """
-    if not conn:
-        logging.error("Database connection is not available.")
-        return []
-
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT protocol, count FROM quick_win ORDER BY protocol")
+        cursor.execute("""
+            SELECT protocol, found, details, credentials_found, credential_protocols 
+            FROM quick_wins 
+            ORDER BY 
+                CASE 
+                    WHEN protocol IN ('LDAP', 'HTTP', 'FTP', 'TELNET', 'SMTP', 'IMAP', 'POP3', 'SYSLOG', 'TFTP') THEN 1
+                    WHEN protocol IN ('SNMPv1', 'SNMPv2', 'SMBv1', 'TLS1.0', 'SSLv2', 'SSLv3') THEN 2
+                    WHEN protocol IN ('LLMNR', 'NETBIOS', 'MDNS') THEN 3
+                    ELSE 4
+                END,
+                protocol
+        """)
         return cursor.fetchall()
     except sqlite3.Error as e:
-        logging.error(f"Error fetching quick win summary: {e}")
-        return []
-
-def display_quick_win_summary(conn):
-    """
-    Display the quick win summary in a table format.
-    
-    Args:
-        conn (sqlite3.Connection): Active database connection.
-    """
-    protocols = get_quick_win_summary(conn)
-    
-    if not protocols:
-        print("\nNo unencrypted protocols were found in the database.")
-        return
-        
-    # Create a Rich table
-    table = Table(
-        title="Unencrypted Protocols Found",
-        show_header=True,
-        header_style="bold magenta",
-        expand=False,
-        show_lines=True,
-        box=rich.box.ROUNDED,
-        padding=(0, 1)
-    )
-    
-    # Add columns
-    table.add_column("Protocol", style="cyan", no_wrap=True, width=15)
-    table.add_column("Instances", style="cyan", no_wrap=True, width=10)
-    
-    # Add data
-    for protocol, count in protocols:
-        table.add_row(protocol, str(count))
-    
-    # Print the table
-    console = Console(
-        width=None,
-        force_terminal=True,
-        color_system="auto",
-        soft_wrap=True
-    )
-    console.print("\nUnencrypted protocols were found:")
-    console.print(table)
-    console.print()
+        logging.error(f"Error getting quick wins: {str(e)}")
+        raise
