@@ -5,7 +5,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 > Detection is not exploitation. A passive finding says what crossed the wire; verify before acting, and respect the scope.
 
-34 entries: 30 passive, 4 active.
+37 entries: 33 passive, 4 active.
 
 ## Inventory (3)
 
@@ -178,11 +178,12 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Capture fields:** kerberos.msg_type, kerberos.SNameString, kerberos.etype, tcp.reassembled.data, udp.payload  
 **Reference:** https://www.thehacker.recipes/ad/movement/kerberos/roasting/targeted-kerberoasting
 
-## Kerberos (1)
+## Kerberos (2)
 
 | When | Handler | Detects | Severity | Status |
 |---|---|---|---|---|
 | AS-REQ/AS-REP exchanges are present | `kerberos` | accounts whose AS-REP was returned without pre-authentication (hashcat 18200) | critical | implemented |
+| Kerberos AS/TGS exchanges carry delegation or PKINIT padata | `kerberosdepth` | S4U/PA-FOR-USER requests, additional-ticket S4U2Proxy, delegation ticket flags, PKINIT followed by a user-to-user request (UnPAC chain) | high | partial |
 
 ### `kerberos` — det.kerberos
 
@@ -194,7 +195,17 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Capture fields:** kerberos.msg_type, kerberos.CNameString, kerberos.realm, kerberos.etype, kerberos.padata_type  
 **Reference:** https://www.thehacker.recipes/ad/movement/kerberos/roasting/
 
-## Ad (6)
+### `kerberosdepth` — det.kerberosdepth
+
+**Mode:** passive  
+**Proves:** an account can delegate, or a certificate logon was followed by a user-to-user request that enables UnPAC-the-hash  
+**Limits:** heuristic from flags/padata; it does not prove the delegation succeeds; hashes are not extracted  
+**Output:** kerberos-signals.tsv; leads KERB-*  
+**Next:** check the account's delegation rights before using the path  
+**Capture fields:** kerberos.padata_type, kerberos.additional_tickets, kerberos.TicketFlags.*  
+**Reference:** https://www.thehacker.recipes/ad/movement/kerberos/delegations/
+
+## Ad (7)
 
 | When | Handler | Detects | Severity | Status |
 |---|---|---|---|---|
@@ -204,6 +215,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 | DCE/RPC binds/requests to EFSRPC, RPRN, DFSNM or FSRVP are present | `coercion` | the coercion interface/pipe and the UNC path from the call data | high | partial |
 | HTTP /certsrv enrollment or Kerberos PKINIT is present | `adcs` | certificate enrollment requests (NTLM flagged high) and PKINIT AS-REQ with its principal | high | partial |
 | SCCM management/distribution HTTP or SMS shares are present | `sccm` | management point, distribution point, site/package shares and authentication state | high | partial |
+| LDAP search results contain sAMAccountName, objectSID or servicePrincipalName | `ldapdir` | SPN-to-account mapping and objectSID when the directory response is captured | medium | partial |
 
 ### `relays` — det.relays
 
@@ -265,7 +277,17 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Capture fields:** http.request.uri, http.host, http.authorization, smb2.tree  
 **Reference:** https://www.thehacker.recipes/ad/movement/sccm-mecm/
 
-## Network (4)
+### `ldapdir` — det.ldapdir
+
+**Mode:** passive  
+**Proves:** the service principal belongs to that account in the observed directory data  
+**Limits:** attribute/value pairing is positional and can be confused by commas or split entries  
+**Output:** ldap-spns.tsv; leads SPN-*; objectSID upgrades BloodHound identifiers  
+**Next:** join the SPN with the Kerberoast hash/lead for the same service  
+**Capture fields:** ldap.AttributeDescription, ldap.AttributeValue  
+**Reference:** https://www.thehacker.recipes/ad/recon/ldap
+
+## Network (5)
 
 | When | Handler | Detects | Severity | Status |
 |---|---|---|---|---|
@@ -273,6 +295,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 | HTTP requests look like Windows Update/WSUS | `wsus` | WSUS endpoints, hosts and indicators | medium | implemented |
 | DNS queries/answers are present | `dns` | query name, record type, A/AAAA/PTR answer; attaches names to host IPs | low | implemented |
 | DHCPv6, ICMPv6 router advertisements or DNS UPDATE are present | `ipv6` | offered DNS servers, RDNSS/DNSSL, and ADIDNS dynamic updates; one host doing both is critical | critical | implemented |
+| SIP or Cisco Skinny/SCCP signalling is present | `voip` | SIP methods (REGISTER/INVITE/MESSAGE), caller/callee, Call-ID, digest auth presence; Skinny call party metadata | medium | implemented |
 
 ### `nac` — det.nac
 
@@ -311,6 +334,15 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Next:** identify the offering host and compare it with the known resolver  
 **Capture fields:** dhcpv6.msgtype, dhcpv6.dns_server, icmpv6.type, icmpv6.opt.rdnss, dns.flags.opcode  
 **Reference:** https://www.thehacker.recipes/ad/movement/mitm-and-coerced-authentications/dhcpv6-spoofing
+
+### `voip` — det.voip
+
+**Mode:** passive  
+**Proves:** call signalling was visible in clear text and which endpoints registered/called  
+**Limits:** media (RTP) is not decoded; TLS/SIPS is opaque; digest challenges are not cracked  
+**Output:** voip.tsv; leads VOIP-*  
+**Next:** review the registrar/PBX exposure and the extension map  
+**Capture fields:** sip.Method, sip.from.user, sip.to.user, sip.Call-ID, sip.Authorization, skinny.CallingPartyNumber  
 
 ## Files (2)
 

@@ -438,6 +438,51 @@
   references: "https://blog.quarkslab.com/agentic-ai-the-confused-deputy-problem.html"
   status: partial
 
+- id: det.kerberosdepth
+  class: kerberos
+  handler: kerberosdepth
+  mode: passive
+  when: "Kerberos AS/TGS exchanges carry delegation or PKINIT padata"
+  detects: "S4U/PA-FOR-USER requests, additional-ticket S4U2Proxy, delegation ticket flags, PKINIT followed by a user-to-user request (UnPAC chain)"
+  proves: "an account can delegate, or a certificate logon was followed by a user-to-user request that enables UnPAC-the-hash"
+  limits: "heuristic from flags/padata; it does not prove the delegation succeeds; hashes are not extracted"
+  fields: "kerberos.padata_type, kerberos.additional_tickets, kerberos.TicketFlags.*"
+  output: "kerberos-signals.tsv; leads KERB-*"
+  severity: high
+  next: "check the account's delegation rights before using the path"
+  references: "https://www.thehacker.recipes/ad/movement/kerberos/delegations/"
+  status: partial
+
+- id: det.ldapdir
+  class: ad
+  handler: ldapdir
+  mode: passive
+  when: "LDAP search results contain sAMAccountName, objectSID or servicePrincipalName"
+  detects: "SPN-to-account mapping and objectSID when the directory response is captured"
+  proves: "the service principal belongs to that account in the observed directory data"
+  limits: "attribute/value pairing is positional and can be confused by commas or split entries"
+  fields: "ldap.AttributeDescription, ldap.AttributeValue"
+  output: "ldap-spns.tsv; leads SPN-*; objectSID upgrades BloodHound identifiers"
+  severity: medium
+  next: "join the SPN with the Kerberoast hash/lead for the same service"
+  references: "https://www.thehacker.recipes/ad/recon/ldap"
+  status: partial
+
+- id: det.voip
+  class: network
+  handler: voip
+  mode: passive
+  when: "SIP or Cisco Skinny/SCCP signalling is present"
+  detects: "SIP methods (REGISTER/INVITE/MESSAGE), caller/callee, Call-ID, digest auth presence; Skinny call party metadata"
+  proves: "call signalling was visible in clear text and which endpoints registered/called"
+  limits: "media (RTP) is not decoded; TLS/SIPS is opaque; digest challenges are not cracked"
+  fields: "sip.Method, sip.from.user, sip.to.user, sip.Call-ID, sip.Authorization, skinny.CallingPartyNumber"
+  output: "voip.tsv; leads VOIP-*"
+  severity: medium
+  next: "review the registrar/PBX exposure and the extension map"
+  references: ""
+  status: implemented
+
 - id: det.quickwins
   class: weakness
   handler: quickwins

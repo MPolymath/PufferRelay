@@ -75,6 +75,8 @@ pufferrelay -r --json
 | `--live IFACE --bpf FILTER` | **ACTIVE** live capture, analysed then deleted |
 | `--proxy --proxy-target HOST:PORT` | **ACTIVE** local TCP relay, JSONL recording |
 | `--commands` / `--serveme` | text-only command generators (nothing executed) |
+| `--report [FILE]` | Markdown engagement report (default `output_dir/report.md`) |
+| `--triage` | rank leads with a **loopback-only** Ollama model (off by default) |
 | `--config FILE` / `--db PATH` | JSON config file and database override |
 
 Active modes print a red warning and require `authorized` (or

@@ -24,6 +24,9 @@ pufferrelay -f capture.pcapng -q --dump out
 | `asrepcatcher.txt` | ASRepCatcher-compatible ARP/Kerberos pattern (links the upstream repo) |
 | `wsus.txt`, `nac.txt`, `dns.txt`, `ipv6.tsv` | update infrastructure, 802.1X/MAB, name map, DHCPv6/RA/ADIDNS |
 | `llm.tsv` | LLM/MCP/vector-DB endpoints and tool calls (metadata only) |
+| `kerberos-signals.tsv`, `ldap-spns.tsv`, `ldap-signing.tsv` | delegation/UnPAC signals, SPN→account/SID, signing inference |
+| `voip.tsv`, `media.tsv` | SIP/Skinny call metadata; audio/video objects already carved |
+| `report.md`, `triage.md` | engagement report; optional localhost-LLM ranking |
 | `files.tsv` + `files/` | carved objects (client data — local only) |
 | `bloodhound/` | Legacy JSON graph (users/computers/sessions) |
 | `summary.json` | inventory + leads for dashboards |
@@ -31,9 +34,11 @@ pufferrelay -f capture.pcapng -q --dump out
 ## Lead prefixes
 
 `CRED`, `HASH`, `ASREP`, `KERBEROAST`/`KERBEROASTCAND`, `TOKEN`, `RELAY`,
-`COERCE`, `ADCS`, `SCCM`, `IPV6`, `DB`, `LLM`, `SMB`, `SMBFILE`, `FILE`,
-`NAC`, `WSUS`, `ASREPCATCHER`, `QW`. Each lead's `evidence` names the source
-file/row; the agent feed never needs to re-parse the database.
+`COERCE`, `ADCS`, `SCCM`, `IPV6`, `DB`, `LLM`, `KERB`, `SPN`, `LDAPSIGN`,
+`CHAIN`, `VOIP`, `SMB`, `SMBFILE`, `FILE`, `NAC`, `WSUS`, `ASREPCATCHER`, `QW`.
+Each lead's `evidence` names the source file/row; the agent feed never needs
+to re-parse the database. Leads carry `confidence` (`high` for hash/secret
+evidence, `medium` for heuristics such as coercion and delegation flags).
 
 ## Lead shape
 

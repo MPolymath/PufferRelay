@@ -30,6 +30,17 @@ def test_every_registered_handler_has_an_entry():
         assert f"handler: {handler}\n" in catalog, handler
 
 
+def test_summary_links_resolve():
+    import re
+
+    with open(os.path.join(ROOT, "wiki", "SUMMARY.md"), encoding="utf-8") as handle:
+        summary = handle.read()
+    links = re.findall(r"\]\(([^)]+\.md)\)", summary)
+    assert links
+    for link in links:
+        assert os.path.exists(os.path.join(ROOT, "wiki", link)), link
+
+
 def test_generated_pages_are_present_and_generated():
     for name in ("DETECTIONS.md", "CHEATSHEET.md"):
         with open(os.path.join(ROOT, "wiki", name), encoding="utf-8") as handle:

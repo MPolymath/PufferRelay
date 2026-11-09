@@ -263,6 +263,50 @@ def create_database(db_path=None):
             )
         """)
 
+        # Kerberos depth and LDAP directory mapping (steps 2/3/5).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS kerberos_signals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                username TEXT,
+                realm TEXT,
+                service TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                detail TEXT,
+                evidence TEXT,
+                UNIQUE(kind, src_ip, dst_ip, username, service)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ldap_spns (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account TEXT,
+                spn TEXT,
+                sid TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                UNIQUE(account, spn, dst_ip)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS voip_calls (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                caller TEXT,
+                callee TEXT,
+                call_id TEXT,
+                detail TEXT,
+                evidence TEXT,
+                UNIQUE(kind, src_ip, dst_ip, caller, call_id)
+            )
+        """)
+
         # SCCM/MECM and LLM/MCP traffic (issues #68, #71).
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sccm_events (

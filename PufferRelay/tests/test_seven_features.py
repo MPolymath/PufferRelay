@@ -71,11 +71,19 @@ def test_kerberoast_der_and_hash_format():
 
 
 def test_kerberoast_hash_and_burst(monkeypatch):
-    rows = [("10.0.0.5", "10.0.0.10", "13", "alice", "CORP",
-             "MSSQLSvc/db.corp:1433", "23", "", "", _kdc_rep().hex())]
-    rows += [("10.0.0.6", "10.0.0.10", "12", "bob", "CORP", f"spn{i}", "23",
-              "", "", "") for i in range(5)]
-    monkeypatch.setattr(kerberoast, "fields", lambda *a, **k: rows)
+    from PufferRelay.protocols import kerberos_shared
+
+    rows = [
+        ("10.0.0.5", "10.0.0.10", "13", "alice", "CORP", "23", "", "",
+         "MSSQLSvc/db.corp:1433", "", "", _kdc_rep().hex(), "", "", "", "")
+    ]
+    rows += [
+        ("10.0.0.6", "10.0.0.10", "12", "bob", "CORP", "23", "", "2",
+         f"spn{i}", "", "", "", "", "", "", "")
+        for i in range(5)
+    ]
+    monkeypatch.setattr(kerberos_shared, "fields", lambda *a, **k: rows)
+    kerberos_shared._CACHE.clear()
     result = kerberoast.process_kerberoast("x.pcap")
     assert any(row[7] == "hash" and row[4] for row in result)
     assert sum(1 for row in result if row[7] == "candidate") == 5

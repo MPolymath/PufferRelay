@@ -15,12 +15,14 @@ registry):
 | Quick-win scan | 95.4 s | 0.6 s | 159x |
 
 Small provided captures: 4.1–5.1 s with the 14-handler registry; most of that
-is tshark startup per handler. The registry has since grown to **29 passive
-handlers plus the quick-win scan**, so a default full run starts roughly 30
-tshark processes. The extended detections (tokens, coercion, ADCS, IPv6,
-database, SCCM, LLM) each add one pass; use `--only` when you do not need them.
+is tshark startup per handler. The current registry has **31 handlers**, and a
+2026-11-09 benchmark on a synthetic 20,000-packet mixed DNS/HTTP capture
+(`python scripts/benchmark.py --packets 20000`) measured **16.5 s for 33 tshark
+passes** (some detectors need two passes; the shared Kerberos pass serves
+`kerberos`, `kerberoast`, `asrepcatcher` and `kerberosdepth` in one). Use
+`--only` when you do not need everything.
 
-The loading screen shows `handler 3/29 ftp | elapsed 00:12 | ETA 00:41`; the
+The loading screen shows `handler 3/31 ftp | elapsed 00:12 | ETA 00:41`; the
 same line is logged at INFO so long runs are predictable.
 
 ## Big captures

@@ -48,6 +48,9 @@ pufferrelay -r --has-creds --json                   # ask the database
 | SMB traffic carries file objects that tshark can reassemble | `smbobjects` | files.tsv, files/ | 8 MiB/object, 16 MiB/capture; SMB3 encryption and missing reassembly yield nothing |
 | SCCM management/distribution HTTP or SMS shares are present | `sccm` | sccm.tsv; leads SCCM-* | SMS Provider DCOM and policy objects are not parsed; package delivery alone is inventory |
 | HTTP traffic targets an LLM service, MCP endpoint or vector database | `llm` | llm.tsv; leads LLM-* | TLS is opaque; ambiguous ports are recognised only by path markers; prompts are not exported |
+| Kerberos AS/TGS exchanges carry delegation or PKINIT padata | `kerberosdepth` | kerberos-signals.tsv; leads KERB-* | heuristic from flags/padata; it does not prove the delegation succeeds; hashes are not extracted |
+| LDAP search results contain sAMAccountName, objectSID or servicePrincipalName | `ldapdir` | ldap-spns.tsv; leads SPN-*; objectSID upgrades BloodHound identifiers | attribute/value pairing is positional and can be confused by commas or split entries |
+| SIP or Cisco Skinny/SCCP signalling is present | `voip` | voip.tsv; leads VOIP-* | media (RTP) is not decoded; TLS/SIPS is opaque; digest challenges are not cracked |
 | -q is used, or -f is combined with -q | `quickwins` | quick_wins table; leads QW-* | presence is not exploitability; signing may be enforced elsewhere |
 
 ## Active modes (opt-in, warned, authorized)

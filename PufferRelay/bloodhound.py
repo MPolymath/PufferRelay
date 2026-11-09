@@ -49,19 +49,23 @@ def build(inventory: Dict) -> Dict[str, Dict]:
             continue
         domain = entry.get("domain") or default_domain
         name = f"{username}@{domain}".upper() if domain else username.upper()
-        identifier = _object_id("user", name)
+        sid = (entry.get("sid") or "").strip()
+        identifier = sid or _object_id("user", name)
         user_lookup[(username.lower(), (domain or "").lower())] = identifier
         user_lookup.setdefault((username.lower(), ""), identifier)
+        properties = {
+            "name": name,
+            "domain": (domain or "").upper(),
+            "samaccountname": username.lower(),
+            "enabled": True,
+            "description": "Observed by PufferRelay in captured traffic",
+        }
+        if sid:
+            properties["objectsid"] = sid
         user_objects.append(
             {
                 "ObjectIdentifier": identifier,
-                "Properties": {
-                    "name": name,
-                    "domain": (domain or "").upper(),
-                    "samaccountname": username.lower(),
-                    "enabled": True,
-                    "description": "Observed by PufferRelay in captured traffic",
-                },
+                "Properties": properties,
                 "Kinds": ["User"],
                 "Aces": [],
                 "HasSIDHistory": [],
@@ -133,8 +137,9 @@ These files were built PASSIVELY from a packet capture. They contain:
   * sessions: an authentication observed from a user towards a host
 
 What this is NOT:
-  * no SIDs, group membership, ACLs, delegation, trusts or DC information
-  * identifiers are deterministic UUIDs, not real SIDs
+  * no group membership, ACLs, delegation or trusts unless captured
+  * identifiers are deterministic UUIDs when no objectSID was seen; when LDAP
+    search results carried objectSID, that SID is used as ObjectIdentifier
   * a session means "credentials were seen going to that host", not "an
     interactive logon was confirmed"
 

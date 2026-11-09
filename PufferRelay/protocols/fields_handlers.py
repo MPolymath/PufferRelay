@@ -45,6 +45,7 @@ from PufferRelay.protocols.helpers import (
     protocol_for_port,
 )
 from PufferRelay.tshark_fields import fields
+from PufferRelay.protocols.kerberos_shared import rows as kerberos_rows
 
 
 def process_ftp(pcap_file):
@@ -284,25 +285,12 @@ def process_smb(pcap_file):
 
 
 def process_kerberos(pcap_file):
-    rows = fields(
-        pcap_file,
-        "kerberos",
-        [
-            "ip.src",
-            "ip.dst",
-            "kerberos.msg_type",
-            "kerberos.CNameString",
-            "kerberos.realm",
-            "kerberos.etype",
-            "kerberos.cipher",
-            "kerberos.padata_type",
-        ],
-        occurrence="a",
-    )
+    rows = kerberos_rows(pcap_file)
     preauth_seen = {}
     out = []
     seen_hashes = set()
-    for src, dst, msg_type, username, realm, etype, cipher, padata in rows:
+    for row in rows:
+        src, dst, msg_type, username, realm, etype, cipher, padata = row[:8]
         kind = (msg_type or "").split(",", 1)[0].strip()
         user = (username or "").split(",", 1)[0].strip()
         realm_value = (realm or "").split(",", 1)[0].strip()

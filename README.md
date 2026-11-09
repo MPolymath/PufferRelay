@@ -58,7 +58,9 @@ pufferrelay -r --dump out <br>
 The pack contains `ips.txt`, `subnets.txt`, `users.txt`, `hosts.tsv`,
 `nmap-targets.txt`, `nmap-command.txt`, `credentials.csv`, `ntlm-hashes.txt`,
 `kerberoast-hashes.txt`, `dns.txt`, `asrepcatcher.txt`, `tokens.tsv`,
-`coercions.tsv`, `adcs.tsv`, `ipv6.tsv`, `db-creds.tsv`, `sccm.tsv`, `llm.tsv`, `summary.json`, and the agent feed: `leads.json` + `leads.md` (every lead with
+`coercions.tsv`, `adcs.tsv`, `ipv6.tsv`, `db-creds.tsv`, `sccm.tsv`, `llm.tsv`,
+`kerberos-signals.tsv`, `ldap-spns.tsv`, `ldap-signing.tsv`, `voip.tsv`,
+`media.tsv`, `summary.json`, and the agent feed: `leads.json` + `leads.md` (every lead with
 its evidence, suggested next actions, and explicit warnings for anything that
 sends traffic). See [docs/OUTPUTS.md](docs/OUTPUTS.md) and
 [docs/PLAN.md](docs/PLAN.md).
@@ -68,6 +70,14 @@ pufferrelay --config config.json -f {filename} <br>
 # config.json: db_path, output_dir, default_pcap, log_level
 # `--dump` without a directory uses output_dir; default_pcap is used when
 # -f/-q is omitted.
+
+#### Report and optional local triage
+```bash
+pufferrelay -f capture.pcapng --report out/report.md   # confidential deliverable
+pufferrelay -r --triage --triage-model llama3          # loopback Ollama only
+```
+`--triage` refuses non-loopback URLs and sends only lead metadata, never
+credentials, hashes, commands or packet data.
 
 #### Query the database
 pufferrelay -r --json <br>

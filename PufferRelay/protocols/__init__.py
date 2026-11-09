@@ -49,6 +49,9 @@ from .database_auth import process_database_auth
 from .smb_objects import process_smb_objects
 from .sccm import process_sccm
 from .llm_traffic import process_llm_traffic
+from .kerberos_depth import process_kerberos_depth
+from .ldapdir import process_ldap_directory
+from .voip import process_voip
 
 __all__ = [
     'process_ldap',
@@ -79,5 +82,8 @@ __all__ = [
     'process_database_auth',
     'process_smb_objects',
     'process_sccm',
-    'process_llm_traffic'
+    'process_llm_traffic',
+    'process_kerberos_depth',
+    'process_ldap_directory',
+    'process_voip'
 ]

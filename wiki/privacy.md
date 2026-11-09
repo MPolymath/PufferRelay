@@ -18,6 +18,10 @@ Client captures are confidential. Full rules: [`docs/PRIVACY.md`](../docs/PRIVAC
   metadata. They stay local and are never logged.
 - LLM/MCP detection exports metadata only (service, endpoint, model, tool
   names); prompts and answers are not written by default.
+- `report.md` is a confidential artifact: it contains real credentials,
+  hashes and internal hosts. `--triage` sends only lead metadata to a
+  **loopback-only** Ollama model (non-loopback URLs are refused); it never
+  sends credentials, hashes, commands or packet data.
 - Live capture and the relay require `--live`/`--proxy`, a red warning and
   authorization; live captures are deleted after analysis unless
   `--keep-live-capture` is set.

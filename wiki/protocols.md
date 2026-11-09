@@ -167,6 +167,30 @@ narrow: a capture proves traffic, not intent.
 - Limit: TLS is opaque; local services on ambiguous ports (8080/8000) are only
   recognised by path markers.
 
+## Kerberos depth
+- One union Kerberos/ARP pass feeds `kerberos`, `kerberoast` and
+  `asrepcatcher`; this module reads padata types 129/130 (S4U), additional
+  tickets (S4U2Proxy), delegation ticket flags and a PKINIT→U2U sequence
+  (UnPAC-the-hash).
+- Proves: delegation is possible or a certificate logon was followed by a
+  user-to-user request.
+- Limit: flags are heuristic; the path is not proven and hashes are not
+  extracted here.
+
+## LDAP directory
+- Pairs `ldap.AttributeDescription` with `ldap.AttributeValue` in
+  searchResultEntry packets to map `servicePrincipalName` to
+  `sAMAccountName`, and captures `objectSID` when present.
+- Proves: the service principal belongs to that account in the observed
+  directory response; objectSID upgrades the BloodHound identifier.
+- Limit: positional pairing; commas or split entries can confuse it.
+
+## VoIP
+- SIP methods/caller/callee/Call-ID/digest-auth presence and Skinny/SCCP call
+  party metadata.
+- Proves: call signalling was visible in clear text.
+- Limit: RTP media is not decoded; SIPS/TLS is opaque.
+
 ## Files
 - HTTP response bodies and FTP-DATA objects, sha256, size, safe name.
 - Limit: objects split across many TCP segments depend on tshark reassembly.

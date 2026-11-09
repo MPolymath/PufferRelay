@@ -66,6 +66,25 @@ Each handler is one field-extraction pass. With the extended detections the
 registry is large; use `--only` or `--credentials-only` when you do not need
 everything (see [performance.md](performance.md)).
 
+**What are the KERB / SPN / LDAPSIGN / CHAIN / VOIP leads?**
+KERB is a delegation/S4U/UnPAC signal, SPN maps a service principal to an
+account (and SID when LDAP captured it), LDAPSIGN says a destination only saw
+simple (unsigned) binds, CHAIN correlates coercion/credentials with a relay
+target, VOIP is SIP/Skinny signalling. All are `medium` confidence heuristics
+unless the evidence says otherwise.
+
+**Does `--report` or `--triage` send my data anywhere?**
+`report.md` is written locally and contains real secrets; treat it like the
+export pack. `--triage` refuses any non-loopback Ollama URL and sends only lead
+metadata (id, severity, confidence, title) and counts — never credentials,
+hashes, commands or packet data.
+
+**Why does a full run take so many tshark passes?**
+Each handler is one pass; a few need two. The shared Kerberos pass serves
+`kerberos`, `kerberoast`, `asrepcatcher` and `kerberosdepth` in one process.
+Use `--only` or `--credentials-only` on large captures; `scripts/benchmark.py`
+prints the pass count on synthetic data.
+
 **Where is the database?**
 By default `extracted_data.db` in the working directory. Use `--db PATH` or
 `db_path` in the config file to keep it with the engagement; delete it with the

@@ -82,6 +82,13 @@ Rules an agent must follow when consuming it:
 | `db-creds.tsv` | protocol, src/dst, user, secret/response | database access |
 | `sccm.tsv` | MP/DP/site share, host, URI, auth | SCCM relay target review |
 | `llm.tsv` | service, host, path, model, auth, MCP detail | AI infrastructure inventory |
+| `kerberos-signals.tsv` | S4U/delegation/UnPAC signals | AD delegation review |
+| `ldap-spns.tsv` | account, SPN, objectSID | Kerberoast targeting, BloodHound SIDs |
+| `ldap-signing.tsv` | destination, bind counts, simple/SASL | LDAP relay candidate |
+| `voip.tsv` | SIP/Skinny call metadata | voice exposure |
+| `media.tsv` | audio/video objects already carved | media triage |
+| `report.md` | full Markdown report | **confidential** engagement deliverable |
+| `triage.md` | localhost-LLM lead ranking | optional, loopback only |
 | `files.tsv` | sha256, size, type, protocol, src, dst, name, path | index of carved objects |
 | `files/` | the carved objects themselves | **client data**, local only |
 | `bloodhound/users.json`, `computers.json` | SharpHound Legacy JSON built from observed users/hosts/sessions | import as leads (no SIDs/ACLs) |
@@ -100,6 +107,8 @@ pufferrelay -r --protocol ftp,ntlm                     # raw rows for those prot
 pufferrelay -r --ip 10.0.0.5                           # every row touching that IP
 pufferrelay -r --user alice --has-creds                # that identity's secrets
 pufferrelay -r --table dns_events --limit 100          # raw table dump
+pufferrelay -f capture.pcap --report out/report.md    # engagement report
+pufferrelay -r --triage                               # loopback Ollama only
 pufferrelay -r --protocol ftp --json                  # tab-separated (machine mode)
 ```
 

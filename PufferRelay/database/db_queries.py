@@ -257,6 +257,29 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} SMB objects")
+        elif protocol == "kerberosdepth":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO kerberos_signals
+                    (kind, severity, username, realm, service, src_ip, dst_ip,
+                     detail, evidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} Kerberos signals")
+        elif protocol == "ldapdir":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO ldap_spns
+                    (account, spn, sid, src_ip, dst_ip)
+                VALUES (?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} LDAP SPN rows")
+        elif protocol == "voip":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO voip_calls
+                    (kind, severity, src_ip, dst_ip, caller, callee, call_id,
+                     detail, evidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} VoIP rows")
         elif protocol == "sccm":
             cursor.executemany("""
                 INSERT OR IGNORE INTO sccm_events
@@ -378,6 +401,14 @@ PROTOCOL_TABLES = {
     "llm": ("llm_events",
             ["kind", "severity", "src_ip", "dst_ip", "service", "host", "path",
              "model", "auth"]),
+    "kerberosdepth": ("kerberos_signals",
+                      ["kind", "severity", "username", "realm", "service",
+                       "src_ip", "dst_ip", "detail"]),
+    "ldapdir": ("ldap_spns",
+                ["account", "spn", "sid", "src_ip", "dst_ip"]),
+    "voip": ("voip_calls",
+             ["kind", "severity", "src_ip", "dst_ip", "caller", "callee",
+              "call_id", "detail"]),
 }
 
 

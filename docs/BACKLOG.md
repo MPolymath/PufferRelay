@@ -56,6 +56,18 @@ Issue bodies: `../attack-library/pufferrelay-issues/` (filed as #64-#71).
 - [x] Wiki restructure: `wiki/detections.yaml` is the source of truth; the
       catalog and cheatsheet are generated and CI-checked; `intake.md` and
       `decision-guide.md` complete the decision-first wiki.
+- [x] Kerberos depth: S4U/delegation flags and UnPAC chains
+      (`kerberos-signals.tsv`, `KERB-*`).
+- [x] LDAP SPN→account/SID mapping and LDAP signing inference
+      (`ldap-spns.tsv`, `ldap-signing.tsv`, `SPN-*`, `LDAPSIGN-*`).
+- [x] Chain correlation (`CHAIN-*`) and confidence scoring on leads.
+- [x] BloodHound objectSID support when LDAP results carry it.
+- [x] Shared cached Kerberos pass + `scripts/benchmark.py` (33 passes / 20k
+      synthetic in 16.5 s) and a benign-capture regression test.
+- [x] `--report` Markdown engagement report and loopback-only `--triage`
+      (Ollama, off by default).
+- [x] VoIP (#17: SIP/Skinny) and media inventory (`media.tsv`); GitBook config
+      (`.gitbook.yaml`, `SUMMARY.md`) prepared.
 - [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM

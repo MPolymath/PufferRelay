@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import re
 
-from PufferRelay.tshark_fields import fields
+from PufferRelay.protocols.kerberos_shared import rows as kerberos_rows
 
 TGS_REQ = 12
 TGS_REP = 13
@@ -116,22 +116,7 @@ SPN_HINT = re.compile(r"^[A-Za-z0-9._/-]+$")
 
 
 def process_kerberoast(pcap_file):
-    rows = fields(
-        pcap_file,
-        "kerberos.msg_type == 12 || kerberos.msg_type == 13",
-        [
-            "ip.src",
-            "ip.dst",
-            "kerberos.msg_type",
-            "kerberos.CNameString",
-            "kerberos.realm",
-            "kerberos.SNameString",
-            "kerberos.etype",
-            "tcp.reassembled.data",
-            "tcp.payload",
-            "udp.payload",
-        ],
-    )
+    rows = kerberos_rows(pcap_file)
 
     requests = {}
     out = []
@@ -144,7 +129,10 @@ def process_kerberoast(pcap_file):
         seen.add(key)
         out.append(row)
 
-    for src, dst, msg_type, user, realm, spn, etype, reassembled, payload, udp in rows:
+    for row in rows:
+        src, dst, msg_type, user, realm, etype = row[:6]
+        spn = row[8]
+        reassembled, payload, udp = row[9], row[10], row[11]
         try:
             message = int(str(msg_type).strip())
         except (TypeError, ValueError):

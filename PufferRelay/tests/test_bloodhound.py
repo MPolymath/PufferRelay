@@ -69,4 +69,4 @@ def test_write_outputs_valid_json_and_readme():
                 assert isinstance(payload, dict) and payload
         with open(os.path.join(out, "README.txt"), encoding="utf-8") as handle:
             text = handle.read()
-        assert "PASSIVELY" in text and "not real SIDs" in text
+        assert "PASSIVELY" in text and "objectSID" in text

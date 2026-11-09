@@ -16,6 +16,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import re
 import sqlite3
 import time
 from collections import defaultdict
@@ -202,16 +203,30 @@ def collect_users(conn: sqlite3.Connection) -> List[Dict]:
             if identity and not looks_like_mac(identity):
                 add(identity, kind or "eap", "")
 
+    # LDAP directory: the SPN mapping names the accounts behind service SPNs,
+    # and objectSID (when captured) upgrades the BloodHound identifier.
+    sid_by_user = {}
+    if _has_table(conn, "ldap_spns"):
+        for account, sid in _rows(
+            conn, "SELECT account, sid FROM ldap_spns WHERE sid != ''"
+        ):
+            add(account, "ldap-spn", "")
+            user, domain = _normalise_username(account)
+            if user:
+                sid_by_user[(domain.lower(), user)] = sid
+
     out = []
     for (domain_key, user), sources in seen.items():
-        out.append(
-            {
-                "username": user,
-                "domain": display_domain.get((domain_key, user), domain_key),
-                "sources": sorted(sources),
-                "seen_at": sorted({h for h in hosts[(domain_key, user)] if h and h != "N/A"}),
-            }
-        )
+        entry = {
+            "username": user,
+            "domain": display_domain.get((domain_key, user), domain_key),
+            "sources": sorted(sources),
+            "seen_at": sorted({h for h in hosts[(domain_key, user)] if h and h != "N/A"}),
+        }
+        sid = sid_by_user.get((domain_key, user))
+        if sid:
+            entry["sid"] = sid
+        out.append(entry)
     out.sort(key=lambda u: (u["domain"], u["username"].lower()))
     return out
 
@@ -826,8 +841,201 @@ def collect_llm(conn: sqlite3.Connection) -> List[Dict]:
     return out
 
 
+def collect_kerberos_signals(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "kerberos_signals"):
+        return out
+    for kind, severity, user, realm, service, src, dst, detail, evidence in _rows(
+        conn,
+        "SELECT kind, severity, username, realm, service, src_ip, dst_ip, detail, "
+        "evidence FROM kerberos_signals",
+    ):
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "medium",
+                "username": user or "",
+                "realm": realm or "",
+                "service": service or "",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "detail": detail or "",
+                "evidence": parsed,
+            }
+        )
+    return out
+
+
+def collect_ldap_spns(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "ldap_spns"):
+        return out
+    for account, spn, sid, src, dst in _rows(
+        conn, "SELECT account, spn, sid, src_ip, dst_ip FROM ldap_spns"
+    ):
+        out.append(
+            {
+                "account": account or "",
+                "spn": spn or "",
+                "sid": sid or "",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+            }
+        )
+    return out
+
+
+def collect_ldap_signing(conn: sqlite3.Connection) -> List[Dict]:
+    """Per destination: total binds vs simple (unsigned) binds.
+
+    A destination that only ever saw simple binds is a signing candidate; a
+    SASL bind is not proof that signing was enforced, so the lead stays medium.
+    """
+    out = []
+    if not _has_table(conn, "ldap_requests"):
+        return out
+    for dst, binds, simple in _rows(
+        conn,
+        "SELECT destination_ip, COUNT(*), "
+        "SUM(CASE WHEN ldap_simple IS NOT NULL AND ldap_simple != '' "
+        "AND ldap_simple != 'N/A' THEN 1 ELSE 0 END) "
+        "FROM ldap_requests GROUP BY destination_ip",
+    ):
+        binds = int(binds or 0)
+        simple = int(simple or 0)
+        if not binds:
+            continue
+        out.append(
+            {
+                "destination_ip": dst or "",
+                "binds": binds,
+                "simple_binds": simple,
+                "sasl_binds": max(0, binds - simple),
+            }
+        )
+    return out
+
+
+def _unc_host(unc: str) -> str:
+    match = re.match(r"^\\\\+([^\\]+)", unc or "")
+    return match.group(1) if match else ""
+
+
+def build_chains(inventory: Dict) -> List[Dict]:
+    """Correlate coercion, credentials/hashes and relay targets into chains."""
+    hosts = inventory.get("hosts", [])
+    by_name = {}
+    for host in hosts:
+        for name in host.get("hostnames") or []:
+            by_name[name.lower()] = host["ip"]
+    credentials = inventory.get("credentials", [])
+    hashes = inventory.get("hashes", [])
+    relays = [
+        relay
+        for relay in inventory.get("relays", [])
+        if relay.get("candidate") and relay.get("signing_required") is False
+    ]
+
+    def users_at(target):
+        users = {row["username"] for row in credentials if row["destination_ip"] == target}
+        users |= {row["username"] for row in hashes if row["destination_ip"] == target}
+        return {user for user in users if user}
+
+    chains = []
+    seen = set()
+
+    def add(kind, severity, target, users, source, evidence):
+        key = (kind, target, ",".join(sorted(users)))
+        if key in seen or not target:
+            return
+        seen.add(key)
+        chains.append(
+            {
+                "kind": kind,
+                "severity": severity,
+                "target": target,
+                "users": sorted(users),
+                "source": source,
+                "evidence": evidence,
+            }
+        )
+
+    for row in inventory.get("coercions", []):
+        host = _unc_host(row.get("unc", ""))
+        if not host:
+            continue
+        target = by_name.get(host.lower(), host)
+        users = users_at(target)
+        relay = any(item["destination_ip"] == target for item in relays)
+        if users or relay:
+            add(
+                "coercion-relay-chain",
+                "critical" if users else "high",
+                target,
+                users,
+                row.get("kind", ""),
+                {
+                    "coercion": row.get("kind", ""),
+                    "unc": row.get("unc", ""),
+                    "relay_target": relay,
+                    "users": sorted(users),
+                },
+            )
+
+    for relay in relays:
+        target = relay["destination_ip"]
+        users = users_at(target)
+        if users:
+            add(
+                "credential-relay-chain",
+                "high",
+                target,
+                users,
+                relay.get("protocol", ""),
+                {
+                    "protocol": relay.get("protocol", ""),
+                    "signing_required": relay.get("signing_required"),
+                    "users": sorted(users),
+                },
+            )
+    return chains
+
+
+def collect_voip(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "voip_calls"):
+        return out
+    for kind, severity, src, dst, caller, callee, call_id, detail, evidence in _rows(
+        conn,
+        "SELECT kind, severity, src_ip, dst_ip, caller, callee, call_id, detail, "
+        "evidence FROM voip_calls",
+    ):
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "low",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "caller": caller or "",
+                "callee": callee or "",
+                "call_id": call_id or "",
+                "detail": detail or "",
+                "evidence": parsed,
+            }
+        )
+    return out
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
-    return {
+    inventory = {
         "hosts": collect_hosts(conn),
         "users": collect_users(conn),
         "credentials": collect_credentials(conn),
@@ -848,7 +1056,13 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "database_credentials": collect_database_creds(conn),
         "sccm": collect_sccm(conn),
         "llm": collect_llm(conn),
+        "kerberos_signals": collect_kerberos_signals(conn),
+        "ldap_spns": collect_ldap_spns(conn),
+        "ldap_signing": collect_ldap_signing(conn),
+        "voip": collect_voip(conn),
     }
+    inventory["chains"] = build_chains(inventory)
+    return inventory
 
 
 # --------------------------------------------------------------------------- #
@@ -926,6 +1140,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
     def add(lead: Dict) -> None:
         lead.setdefault("suggested_actions", [])
         lead.setdefault("passive", True)
+        lead.setdefault("confidence", "high")
         leads.append(lead)
 
     # 1. Quick wins that are directly exploitable.
@@ -1081,6 +1296,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
             {
                 "id": f"ASREPCATCHER-{i:03d}",
                 "severity": finding.get("severity") or "high",
+                "confidence": "medium",
                 "title": f"ASRepCatcher-compatible activity: {finding['kind']}",
                 "why": finding["summary"]
                 + " This matches the ASRepCatcher technique "
@@ -1113,6 +1329,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
             {
                 "id": f"KERBEROAST-{i:03d}" if has_hash else f"KERBEROASTCAND-{i:03d}",
                 "severity": "critical" if has_hash else "high",
+                "confidence": "high" if has_hash else "medium",
                 "title": (
                     f"Kerberoastable service ticket for {row['spn']}"
                     if has_hash
@@ -1186,6 +1403,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
             {
                 "id": f"COERCE-{i:03d}",
                 "severity": row["severity"],
+                "confidence": "medium",
                 "title": f"{row['kind']} coercion attempt",
                 "why": "The victim was told to authenticate to "
                 f"{row['unc'] or 'an attacker-controlled host'}; this is the "
@@ -1209,6 +1427,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
             {
                 "id": f"ADCS-{i:03d}",
                 "severity": row["severity"],
+                "confidence": "medium",
                 "title": f"ADCS {row['kind']} activity"
                 + (f" to {row['host']}" if row["host"] else ""),
                 "why": "Certificate enrollment or PKINIT logon was observed. "
@@ -1231,6 +1450,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
             {
                 "id": f"IPV6-{i:03d}",
                 "severity": row["severity"],
+                "confidence": "medium",
                 "title": f"{row['kind']} on the segment",
                 "why": "A rogue DHCPv6/RA DNS source or ADIDNS dynamic update "
                 "can redirect name resolution and harvest credentials.",
@@ -1253,6 +1473,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
             {
                 "id": f"DB-{i:03d}",
                 "severity": "critical" if cleartext else "high",
+                "confidence": "high" if cleartext else "medium",
                 "title": f"{row['protocol']} credential material"
                 + (f" for {row['username']}" if row["username"] else ""),
                 "why": (
@@ -1331,6 +1552,123 @@ def build_leads(inventory: Dict) -> List[Dict]:
                     {
                         "intent": "Review the service and whether it should be reachable",
                         "command": "inspect llm.tsv and the matching HTTP flow",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3k. Kerberos delegation / S4U / UnPAC signals.
+    for i, row in enumerate(inventory.get("kerberos_signals", []), start=1):
+        add(
+            {
+                "id": f"KERB-{i:03d}",
+                "severity": row["severity"],
+                "confidence": "medium",
+                "title": f"Kerberos {row['kind']}"
+                + (f" for {row['username']}" if row["username"] else ""),
+                "why": row["detail"]
+                + " Delegation and PKINIT/U2U signals can turn an account into "
+                "a path to another service; verify the flags in the ticket.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Check delegation rights for the account",
+                        "command": "review the principal in the directory and its "
+                        "allowed-to-delegate settings",
+                        "active": False,
+                        "warning": "Read-only analysis; do not assume the path "
+                        "works without confirmation.",
+                    }
+                ],
+            }
+        )
+
+    # 3l. SPNs mapped to accounts from LDAP search results.
+    for i, row in enumerate(inventory.get("ldap_spns", []), start=1):
+        add(
+            {
+                "id": f"SPN-{i:03d}",
+                "severity": "medium",
+                "title": f"SPN {row['spn']} belongs to {row['account']}",
+                "why": "The capture mapped a service SPN to its account. That "
+                "turns a Kerberoast target into a named principal.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Request a service ticket for the named account",
+                        "command": "use the Kerberoast hash/lead for this SPN; no "
+                        "extra traffic is needed if the hash was captured",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3m. LDAP signing inference per destination.
+    for i, row in enumerate(inventory.get("ldap_signing", []), start=1):
+        if not row["simple_binds"]:
+            continue
+        add(
+            {
+                "id": f"LDAPSIGN-{i:03d}",
+                "severity": "medium",
+                "confidence": "medium",
+                "title": f"Simple LDAP binds to {row['destination_ip']}",
+                "why": f"{row['simple_binds']} of {row['binds']} binds were "
+                "simple (unsigned). That is consistent with LDAP signing not "
+                "being enforced, which makes the destination a relay candidate.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Check LDAP signing/channel binding on the DC",
+                        "command": "nxc ldap <dc> -u <user> -p <pass> -M "
+                        "ldap-checker",
+                        "active": True,
+                        "warning": "Active: authenticates to LDAP. Confirm scope.",
+                    }
+                ],
+            }
+        )
+
+    # 3n. Correlated attack chains.
+    for i, chain in enumerate(inventory.get("chains", []), start=1):
+        add(
+            {
+                "id": f"CHAIN-{i:03d}",
+                "severity": chain["severity"],
+                "title": f"{chain['kind']} against {chain['target']}",
+                "why": "The capture contains both halves of an attack path: a "
+                "coercion/credential and a host that accepts it. Treat it as a "
+                "chain to verify, not a completed compromise.",
+                "evidence": chain,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the correlated rows in one place",
+                        "command": "compare coercions.tsv, relays.tsv and "
+                        "credentials.csv for the target",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3o. VoIP signalling.
+    for i, row in enumerate(inventory.get("voip", []), start=1):
+        add(
+            {
+                "id": f"VOIP-{i:03d}",
+                "severity": row["severity"],
+                "title": f"{row['kind']}"
+                + (f": {row['caller']} -> {row['callee']}" if row["callee"] else ""),
+                "why": row["detail"]
+                + " Call signalling can reveal extensions, registrations and "
+                "authentication material; media is not decoded.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the SIP/Skinny endpoint and its exposure",
+                        "command": "inspect voip.tsv and the matching signalling flow",
                         "active": False,
                     }
                 ],
@@ -2010,6 +2348,59 @@ def write_exports(
             f"{row['host'] or '-'}	{row['path'] or '-'}	{row['model'] or '-'}	"
             f"{row['auth']}	{row['detail']}"
             for row in inventory.get("llm", [])
+        ],
+    )
+    _write_text(
+        path("kerberos-signals.tsv"),
+        ["kind	severity	user	realm	service	src	dst	detail"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['username'] or '-'}	"
+            f"{row['realm'] or '-'}	{row['service'] or '-'}	"
+            f"{row['source_ip'] or '-'}	{row['destination_ip'] or '-'}	{row['detail']}"
+            for row in inventory.get("kerberos_signals", [])
+        ],
+    )
+    _write_text(
+        path("ldap-spns.tsv"),
+        ["account	spn	sid	src	dst"]
+        + [
+            f"{row['account']}	{row['spn']}	{row['sid'] or '-'}	"
+            f"{row['source_ip'] or '-'}	{row['destination_ip'] or '-'}"
+            for row in inventory.get("ldap_spns", [])
+        ],
+    )
+    _write_text(
+        path("ldap-signing.tsv"),
+        ["destination	binds	simple	sasl"]
+        + [
+            f"{row['destination_ip'] or '-'}	{row['binds']}	"
+            f"{row['simple_binds']}	{row['sasl_binds']}"
+            for row in inventory.get("ldap_signing", [])
+        ],
+    )
+    _write_text(
+        path("voip.tsv"),
+        ["kind	severity	src	dst	caller	callee	call_id	detail"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['caller'] or '-'}	"
+            f"{row['callee'] or '-'}	{row['call_id'] or '-'}	{row['detail']}"
+            for row in inventory.get("voip", [])
+        ],
+    )
+    media = [
+        row
+        for row in inventory.get("files", [])
+        if (row.get("content_type") or "").startswith(("audio/", "video/"))
+    ]
+    _write_text(
+        path("media.tsv"),
+        ["sha256	size	type	protocol	src	dst	filename"]
+        + [
+            f"{row['sha256']}	{row['size']}	{row['content_type']}	"
+            f"{row['protocol']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['filename']}"
+            for row in media
         ],
     )
 

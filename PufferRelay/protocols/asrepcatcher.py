@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import json
 
-from PufferRelay.tshark_fields import fields
+from PufferRelay.protocols.kerberos_shared import rows as kerberos_rows
 
 REFERENCE = "https://github.com/Yaxxine7/ASRepCatcher"
 CRACKABLE_ETYPES = {"17", "18", "23"}
@@ -253,25 +253,24 @@ def detect(rows):
 
 def process_asrepcatcher(pcap_file):
     """Return DB rows for ASRepCatcher-compatible activity in the capture."""
-    rows = fields(
-        pcap_file,
-        "kerberos || arp",
-        [
-            "frame.number",
-            "ip.src",
-            "ip.dst",
-            "arp.opcode",
-            "arp.src.proto_ipv4",
-            "arp.src.hw_mac",
-            "arp.dst.proto_ipv4",
-            "kerberos.msg_type",
-            "kerberos.CNameString",
-            "kerberos.realm",
-            "kerberos.etype",
-            "kerberos.padata_type",
-        ],
-        occurrence="a",
-    )
+    extracted = kerberos_rows(pcap_file)
+    rows = [
+        (
+            "",
+            row[0],
+            row[1],
+            row[12],
+            row[13],
+            row[14],
+            row[15],
+            row[2],
+            row[3],
+            row[4],
+            row[5],
+            row[7],
+        )
+        for row in extracted
+    ]
     out = []
     for finding in detect(rows):
         out.append(

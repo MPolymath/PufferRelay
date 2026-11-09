@@ -174,8 +174,8 @@ def main():
         "--only",
         help="Run only these handlers, comma separated "
         "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,kerberos,"
-        "kerberoast,httptokens,coercion,adcs,ipv6,dbcreds,smbobjects,sccm,llm,"
-        "services,dns,asrepcatcher,ips)",
+        "kerberosdepth,kerberoast,ldapdir,httptokens,coercion,adcs,ipv6,dbcreds,"
+        "smbobjects,sccm,llm,voip,services,dns,asrepcatcher,ips)",
     )
     parser.add_argument(
         "--credentials-only",
@@ -215,9 +215,9 @@ def main():
     parser.add_argument(
         "--protocol",
         help="With -r: show the raw rows of these protocols "
-        "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,kerberos,kerberoast,"
-        "httptokens,coercion,adcs,ipv6,dbcreds,sccm,llm,services,dns,"
-        "asrepcatcher,ips)",
+        "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,kerberos,"
+        "kerberosdepth,kerberoast,ldapdir,httptokens,coercion,adcs,ipv6,dbcreds,"
+        "sccm,llm,voip,services,dns,asrepcatcher,ips)",
     )
     parser.add_argument(
         "--ip",
@@ -244,6 +244,34 @@ def main():
         type=int,
         default=500,
         help="Max rows per table for -r filters (default 500)",
+    )
+    parser.add_argument(
+        "--report",
+        nargs="?",
+        const="",
+        metavar="FILE",
+        help="Write a Markdown engagement report (default: output_dir/report.md)",
+    )
+    parser.add_argument(
+        "--triage",
+        action="store_true",
+        help="Ask a LOCAL Ollama model to rank the leads (loopback only; off by "
+        "default; no secrets are sent)",
+    )
+    parser.add_argument(
+        "--triage-model",
+        default="llama3",
+        help="Ollama model for --triage (default: llama3)",
+    )
+    parser.add_argument(
+        "--ollama-url",
+        default="http://127.0.0.1:11434",
+        help="Ollama base URL; must be loopback (default: 127.0.0.1:11434)",
+    )
+    parser.add_argument(
+        "--triage-out",
+        metavar="FILE",
+        help="Triage output path (default: output_dir/triage.md)",
     )
     parser.add_argument(
         "--log-level",
@@ -340,8 +368,12 @@ def main():
 
     machine = bool(args.json or args.creds or args.inventory)
 
-    # Query filters imply reading an existing database.
+    # Query filters and report generation imply reading an existing database.
     if args.ip or args.user or args.has_creds or args.table:
+        args.read = True
+    if args.report is not None and not (args.file or args.quick_wins or args.read):
+        args.read = True
+    if args.triage and not (args.file or args.quick_wins or args.read):
         args.read = True
 
     # ---- active modes: explicit, warned, confirmed, never default -----
@@ -588,6 +620,71 @@ def main():
             if args.dump is not None:
                 dump_dir = args.dump or get_output_dir() or "out"
                 run_exports(conn, dump_dir, pcap_name=args.file or args.quick_wins or "")
+
+            if args.report is not None:
+                from PufferRelay import report as report_module
+
+                report_path = args.report or os.path.join(
+                    get_output_dir() or "out", "report.md"
+                )
+                try:
+                    written = report_module.write_report(
+                        conn, report_path, pcap_name=args.file or args.quick_wins or ""
+                    )
+                except Exception as report_error:
+                    logging.error("Report generation failed: %s", report_error)
+                    raise
+                if machine:
+                    print(written, file=sys.stderr)
+                else:
+                    rprint(
+                        Panel(
+                            "[green]Engagement report written:[/green]\n"
+                            f"  {written}\n\n"
+                            "[bold red]Confidential:[/bold red] it contains real "
+                            "credentials and hashes.",
+                            title="Report",
+                            border_style="red",
+                        )
+                    )
+
+            if args.triage:
+                from PufferRelay import triage as triage_module
+
+                inventory = export.collect_inventory(conn)
+                leads = export.build_leads(inventory)
+                try:
+                    text = triage_module.run_triage(
+                        inventory,
+                        leads,
+                        url=args.ollama_url,
+                        model=args.triage_model,
+                    )
+                except ValueError as triage_error:
+                    print(f"triage error: {triage_error}", file=sys.stderr)
+                    sys.exit(2)
+                except Exception as triage_error:
+                    logging.error("Local triage failed: %s", triage_error)
+                    sys.exit(1)
+                triage_path = args.triage_out or os.path.join(
+                    get_output_dir() or "out", "triage.md"
+                )
+                triage_module.write_triage(
+                    triage_path, text, args.triage_model, args.ollama_url
+                )
+                if machine:
+                    print(triage_path, file=sys.stderr)
+                else:
+                    rprint(
+                        Panel(
+                            "[green]Local triage written:[/green]\n"
+                            f"  {triage_path}\n\n"
+                            "Loopback model only; lead metadata was sent, never "
+                            "credentials or packet data.",
+                            title="Local LLM triage",
+                            border_style="green",
+                        )
+                    )
 
             if args.commands or args.serveme:
                 include = []

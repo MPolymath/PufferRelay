@@ -14,7 +14,11 @@ misses, output, next step) is **[DETECTIONS.md](DETECTIONS.md)**, generated from
 | Hosts | IP inventory grouped by /24, NetBIOS/DNS names and MACs, observed TCP services |
 | DNS | queries/answers (A, AAAA, PTR, ...), name↔IP map, `dns.txt` |
 | AD | SMB share/file names, printer shares, relay candidates (SMB signing flags + NTLM over SMB/LDAP/HTTP) |
-| Kerberos attacks | Kerberoasting (hashcat 13100/19600/19700), ASRepCatcher-compatible ARP/relay pattern, AS-REP roastable accounts |
+| Kerberos attacks | Kerberoasting (hashcat 13100/19600/19700), S4U/delegation flags, UnPAC chains, ASRepCatcher-compatible ARP/relay pattern, AS-REP roastable accounts |
+| AD directory | SPN→account mapping and objectSID from LDAP results; LDAP signing inference |
+| Attack chains | coercion + credential/hash + relay target, and credential + relay target correlations |
+| VoIP | SIP registrations/calls (digest presence), Skinny/SCCP call metadata |
+| Reporting | `report.md` engagement report, optional loopback-Ollama triage (`triage.md`) |
 | Secrets | HTTP bearer/JWT/Vault/GitLab/GitHub/AWS tokens (fingerprinted in exports), database auth material |
 | AD exposure | RPC coercion attempts, ADCS enrollment/PKINIT, SCCM management traffic, relay candidates |
 | AI infrastructure | LLM endpoints/API usage, unauthenticated inference, MCP tool calls, vector DBs |
@@ -29,7 +33,9 @@ misses, output, next step) is **[DETECTIONS.md](DETECTIONS.md)**, generated from
 `relay-targets.txt`, `relays.tsv`, `smb-shares.txt`, `smb-files.txt`,
 `wsus.txt`, `nac.txt`, `dns.txt`, `asrepcatcher.txt`, `kerberoast-hashes.txt`,
 `tokens.tsv`, `coercions.tsv`, `adcs.tsv`, `ipv6.tsv`, `db-creds.tsv`,
-`sccm.tsv`, `llm.tsv`, `files.tsv` + `files/`, `bloodhound/`, `summary.json`.
+`sccm.tsv`, `llm.tsv`, `kerberos-signals.tsv`, `ldap-spns.tsv`,
+`ldap-signing.tsv`, `voip.tsv`, `media.tsv`, `files.tsv` + `files/`,
+`bloodhound/`, `summary.json`.
 
 ## Agent feed
 

@@ -21,6 +21,29 @@ WINDOWS_TSHARK_PATHS = [
 ]
 
 _FIELD_SEPARATOR = "\t"
+_RESULT_CACHE = {}
+PASS_COUNT = 0
+
+
+def reset_pass_count():
+    """Testing/benchmark hook: number of tshark passes in this process."""
+    global PASS_COUNT
+    PASS_COUNT = 0
+
+
+def _cache_key(pcap_file, display_filter, field_names, occurrence):
+    try:
+        stat = os.stat(pcap_file)
+    except OSError:
+        return None
+    return (
+        os.path.abspath(pcap_file),
+        stat.st_size,
+        stat.st_mtime_ns,
+        display_filter,
+        tuple(field_names),
+        occurrence,
+    )
 
 
 def find_tshark() -> str:
@@ -52,6 +75,12 @@ def fields(
         raise RuntimeError("tshark is not installed")
     if not field_names:
         return []
+
+    global PASS_COUNT
+    key = _cache_key(pcap_file, display_filter, field_names, occurrence)
+    if key is not None and key in _RESULT_CACHE:
+        return list(_RESULT_CACHE[key])
+    PASS_COUNT += 1
 
     command = [
         tshark,
@@ -99,4 +128,8 @@ def fields(
         if len(parts) < width:
             parts.extend([""] * (width - len(parts)))
         rows.append(tuple(parts[:width]))
+    if key is not None:
+        if len(_RESULT_CACHE) > 32:
+            _RESULT_CACHE.clear()
+        _RESULT_CACHE[key] = list(rows)
     return rows
