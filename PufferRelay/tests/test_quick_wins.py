@@ -29,20 +29,26 @@ def test_findings_from_rows_classifies_protocols_and_creds():
         ("eth:ip:udp:nbns", "", "", "", "", "", "", "", "", "", "", "", "", ""),
         ("eth:ip:udp:mdns", "", "", "", "", "", "", "", "", "", "", "", "", ""),
     ]
-    found, credentials, smb_missing = findings_from_rows(rows)
+    found, credentials, smb_missing, evidence = findings_from_rows(
+        [("10.0.0.5", "10.0.0.9") + row for row in rows]
+    )
     assert {"LDAP", "HTTP", "FTP", "TELNET", "SMTP", "IMAP", "POP3", "SMBv1"} <= found
     assert {"SNMPv2", "SSLv3", "LLMNR", "NETBIOS", "MDNS", "SMB_SIGNING_MISSING"} <= found
     assert "TLS1.0" not in found
     assert credentials == {"LDAP", "HTTP", "FTP", "TELNET", "SMTP", "IMAP", "POP3"}
     assert smb_missing is True
+    assert evidence["FTP"]["count"] == 1
+    assert evidence["FTP"]["sources"] == ["10.0.0.5"]
 
 
 def test_findings_no_false_positives():
-    found, credentials, smb_missing = findings_from_rows([])
+    found, credentials, smb_missing, evidence = findings_from_rows([])
     assert found == set() and credentials == set() and smb_missing is False
 
     rows = [("eth:ip:tcp:smb2", "", "", "", "", "", "", "", "", "", "", "", "1", "")]
-    found, credentials, smb_missing = findings_from_rows(rows)
+    found, credentials, smb_missing, evidence = findings_from_rows(
+        [("10.0.0.5", "10.0.0.9") + row for row in rows]
+    )
     assert found == set() and smb_missing is False
 
 
@@ -70,7 +76,10 @@ def test_analyze_quick_wins_on_synthetic_capture():
         conn = create_database(db_path=db_path)
         analyze_quick_wins(pcap, conn)
         row = conn.execute(
-            "SELECT found, credentials_found FROM quick_wins WHERE protocol='FTP'"
+            "SELECT found, credentials_found, severity, evidence FROM quick_wins "
+            "WHERE protocol='FTP'"
         ).fetchone()
-        assert row == (1, 1)
+        assert row[0] == 1 and row[1] == 1
+        assert row[2] == "critical"  # cleartext FTP with credentials
+        assert row[3] and '"count": 2' in row[3]
         conn.close()

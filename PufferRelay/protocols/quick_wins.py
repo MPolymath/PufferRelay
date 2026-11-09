@@ -1,6 +1,8 @@
+import json
 import logging
 
 from PufferRelay.database.db_queries import update_quick_win
+from PufferRelay.severity import CLEARTEXT_PROTOCOLS, severity_for
 from PufferRelay.tshark_fields import fields
 
 # One tshark pass over the protocols that quick wins care about (#55).
@@ -10,6 +12,8 @@ WINDOW_FILTER = (
 )
 
 WINDOW_FIELDS = [
+    "ip.src",
+    "ip.dst",
     "frame.protocols",
     "ldap.simple",
     "http.authorization",
@@ -55,17 +59,31 @@ def _has_credential_words(text):
 
 
 def findings_from_rows(rows):
-    """Classify tshark rows into (found protocols, credential protocols, smb signing).
+    """Classify tshark rows.
 
-    Pure function so the logic is testable without a capture or tshark.
+    Returns (found protocols, credential protocols, smb signing missing,
+    evidence dict). Pure function so the logic is testable without tshark.
     """
     found = set()
     credentials = set()
     smb_signing_missing = False
+    evidence = {}
+
+    def note(protocol, src, dst):
+        entry = evidence.setdefault(
+            protocol, {"count": 0, "sources": set(), "destinations": set()}
+        )
+        entry["count"] += 1
+        if src:
+            entry["sources"].add(src)
+        if dst:
+            entry["destinations"].add(dst)
 
     for row in rows:
         values = list(row) + [""] * (len(WINDOW_FIELDS) - len(row))
         (
+            src_ip,
+            dst_ip,
             protocols,
             ldap_simple,
             http_authorization,
@@ -85,11 +103,13 @@ def findings_from_rows(rows):
 
         if "ldap" in tokens:
             found.add("LDAP")
+            note("LDAP", src_ip, dst_ip)
             if (ldap_simple or "").strip():
                 credentials.add("LDAP")
 
         if "http" in tokens:
             found.add("HTTP")
+            note("HTTP", src_ip, dst_ip)
             if (http_authorization or "").strip() or (
                 (http_form or "").strip() and _has_credential_words(http_form)
             ):
@@ -97,63 +117,84 @@ def findings_from_rows(rows):
 
         if "ftp" in tokens or "ftp-data" in tokens:
             found.add("FTP")
+            note("FTP", src_ip, dst_ip)
             if (ftp_command or "").upper() in {"USER", "PASS"}:
                 credentials.add("FTP")
 
         if "telnet" in tokens:
             found.add("TELNET")
+            note("TELNET", src_ip, dst_ip)
             if _has_credential_words(telnet_data):
                 credentials.add("TELNET")
 
         if "smtp" in tokens:
             found.add("SMTP")
+            note("SMTP", src_ip, dst_ip)
             if (smtp_user or "").strip() or (smtp_password or "").strip():
                 credentials.add("SMTP")
 
         if "imap" in tokens:
             found.add("IMAP")
+            note("IMAP", src_ip, dst_ip)
             if (imap_command or "").lower() in {"login", "authenticate"}:
                 credentials.add("IMAP")
 
         if "pop" in tokens:
             found.add("POP3")
+            note("POP3", src_ip, dst_ip)
             if (pop_command or "").upper() in {"USER", "PASS", "APOP"}:
                 credentials.add("POP3")
 
         if "syslog" in tokens:
             found.add("SYSLOG")
+            note("SYSLOG", src_ip, dst_ip)
         if "tftp" in tokens:
             found.add("TFTP")
+            note("TFTP", src_ip, dst_ip)
 
         if "snmp" in tokens:
             version = (snmp_version or "").strip().lower()
             if version in SNMP_VERSIONS:
                 found.add(SNMP_VERSIONS[version])
+                note(SNMP_VERSIONS[version], src_ip, dst_ip)
 
         if "smb" in tokens and "smb2" not in tokens:
             found.add("SMBv1")
+            note("SMBv1", src_ip, dst_ip)
 
         if "llmnr" in tokens:
             found.add("LLMNR")
+            note("LLMNR", src_ip, dst_ip)
         if "nbns" in tokens or "netbios" in tokens:
             found.add("NETBIOS")
+            note("NETBIOS", src_ip, dst_ip)
         if "mdns" in tokens:
             found.add("MDNS")
+            note("MDNS", src_ip, dst_ip)
 
         if "ssl" in tokens:
             version = (ssl_version or "").strip().lower()
             if version in SSL_VERSIONS:
                 found.add(SSL_VERSIONS[version])
+                note(SSL_VERSIONS[version], src_ip, dst_ip)
 
         if "smb2" in tokens:
             signing = (smb_signing_required or "").strip().lower()
             if signing in {"0", "false"}:
                 smb_signing_missing = True
+                note("SMB_SIGNING_MISSING", src_ip, dst_ip)
 
     if smb_signing_missing:
         found.add("SMB_SIGNING_MISSING")
 
-    return found, credentials, smb_signing_missing
+    evidence_json = {}
+    for protocol, entry in evidence.items():
+        evidence_json[protocol] = {
+            "count": entry["count"],
+            "sources": sorted(entry["sources"])[:5],
+            "destinations": sorted(entry["destinations"])[:5],
+        }
+    return found, credentials, smb_signing_missing, evidence_json
 
 
 def analyze_quick_wins(pcap_file, conn):
@@ -161,6 +202,7 @@ def analyze_quick_wins(pcap_file, conn):
 
     Uses a single tshark field extraction pass instead of regexing every packet
     (the previous implementation took minutes on multi-hundred-MB captures).
+    Severity and evidence (counts + sample endpoints) are stored with each flag.
     """
     try:
         rows = fields(pcap_file, WINDOW_FILTER, WINDOW_FIELDS)
@@ -168,7 +210,12 @@ def analyze_quick_wins(pcap_file, conn):
         logging.error("Quick-win scan skipped: %s", e)
         return
 
-    found_protocols, credential_protocols, smb_signing_missing = findings_from_rows(rows)
+    (
+        found_protocols,
+        credential_protocols,
+        smb_signing_missing,
+        evidence,
+    ) = findings_from_rows(rows)
 
     try:
         cursor = conn.cursor()
@@ -206,6 +253,9 @@ def analyze_quick_wins(pcap_file, conn):
                 else:
                     details = "Protocol found in traffic"
 
+            severity, _why = severity_for(protocol)
+            if credentials_found and protocol in CLEARTEXT_PROTOCOLS:
+                severity = "critical"
             update_quick_win(
                 conn,
                 protocol,
@@ -215,13 +265,16 @@ def analyze_quick_wins(pcap_file, conn):
                 credential_protocols=(
                     credential_protocols_str.split(",") if credential_protocols_str else None
                 ),
+                severity=severity,
+                evidence=json.dumps(evidence[protocol]) if protocol in evidence else None,
             )
 
             logging.info(
-                "Updated quick win for %s: found=%s, credentials=%s",
+                "Updated quick win for %s: found=%s, credentials=%s, severity=%s",
                 protocol,
                 found,
                 credentials_found,
+                severity,
             )
     except Exception as e:
         logging.error("Error analyzing quick wins: %s", str(e))

@@ -66,6 +66,11 @@ def main() -> int:
     parser.add_argument("pcap")
     parser.add_argument("--only", help="comma separated handlers")
     parser.add_argument("--credentials-only", action="store_true")
+    parser.add_argument(
+        "--quick-wins",
+        action="store_true",
+        help="run the quick-win scan (one tshark pass) and report counts only",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.pcap):
@@ -103,6 +108,13 @@ def main() -> int:
         )
         parse_seconds = time.time() - started
         process_extracted_data(data, db_path=db_path)
+
+        if args.quick_wins:
+            from PufferRelay.protocols.quick_wins import analyze_quick_wins
+
+            started_qw = time.time()
+            analyze_quick_wins(args.pcap, conn)
+            print("quickwin_seconds=%.1f" % (time.time() - started_qw))
 
         handler_counts = {name: len(rows) for name, rows in data.items()}
         print(f"parse_seconds={parse_seconds:.1f}")
@@ -147,6 +159,17 @@ def main() -> int:
             aggregates["quick_wins_found"] = cursor.fetchone()[0]
         except sqlite3.Error:
             pass
+        if args.quick_wins:
+            severities = {}
+            for severity, count in cursor.execute(
+                "SELECT severity, COUNT(*) FROM quick_wins WHERE found=1 GROUP BY severity"
+            ):
+                severities[severity or "unset"] = count
+            with_evidence = cursor.execute(
+                "SELECT COUNT(*) FROM quick_wins WHERE found=1 AND evidence IS NOT NULL"
+            ).fetchone()[0]
+            aggregates["quick_win_severities"] = severities
+            aggregates["quick_wins_with_evidence"] = with_evidence
         print("field_aggregates=" + json.dumps(aggregates, sort_keys=True))
 
         inventory = collect_inventory(conn)

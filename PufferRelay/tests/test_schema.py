@@ -15,7 +15,7 @@ def test_fresh_database_has_new_schema():
         assert conn is not None
         cursor = conn.cursor()
         cursor.execute("PRAGMA user_version")
-        assert cursor.fetchone()[0] == 7
+        assert cursor.fetchone()[0] == 8
 
         cursor.execute("PRAGMA table_info(netbios_requests)")
         columns = {row[1] for row in cursor.fetchall()}
@@ -63,7 +63,7 @@ def test_legacy_netbios_table_is_rebuilt():
         columns = {row[1] for row in cursor.fetchall()}
         assert "other_service" in columns and "src_ip" in columns
         cursor.execute("PRAGMA user_version")
-        assert cursor.fetchone()[0] == 7
+        assert cursor.fetchone()[0] == 8
         conn.close()
 
 

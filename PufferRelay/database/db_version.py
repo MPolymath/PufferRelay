@@ -27,7 +27,7 @@ from PufferRelay.core_imports import (
 from PufferRelay.config import DB_NAME
 
 # Current schema version - increment this when making schema changes
-CURRENT_SCHEMA_VERSION = 7
+CURRENT_SCHEMA_VERSION = 8
 
 def migrate_database(conn):
     """Bring an existing database up to CURRENT_SCHEMA_VERSION.
@@ -68,6 +68,13 @@ def migrate_database(conn):
 
         if version < 3:
             cursor.execute("DROP TABLE IF EXISTS netbios_requests")
+
+        if version < 8:
+            for column in ("severity TEXT", "evidence TEXT"):
+                try:
+                    cursor.execute(f"ALTER TABLE quick_wins ADD COLUMN {column}")
+                except sqlite3.Error:
+                    pass  # table absent (fresh DB) or column already there
 
         cursor.execute("PRAGMA user_version = %d" % CURRENT_SCHEMA_VERSION)
         try:

@@ -243,7 +243,9 @@ def create_database(db_path=None):
                 found BOOLEAN DEFAULT FALSE,
                 details TEXT,
                 credentials_found BOOLEAN DEFAULT FALSE,
-                credential_protocols TEXT
+                credential_protocols TEXT,
+                severity TEXT,
+                evidence TEXT
             )
         """)
 

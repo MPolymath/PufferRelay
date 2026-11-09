@@ -355,11 +355,17 @@ def collect_hosts(conn: sqlite3.Connection) -> List[Dict]:
 
 def collect_quick_wins(conn: sqlite3.Connection) -> List[Dict]:
     out = []
-    for protocol, found, details, creds_found, cred_protocols in _rows(
+    for protocol, found, details, creds_found, cred_protocols, severity, evidence in _rows(
         conn,
-        "SELECT protocol, found, details, credentials_found, credential_protocols "
-        "FROM quick_wins",
+        "SELECT protocol, found, details, credentials_found, credential_protocols, "
+        "severity, evidence FROM quick_wins",
     ):
+        observed = None
+        if evidence:
+            try:
+                observed = json.loads(evidence)
+            except (TypeError, ValueError):
+                observed = None
         out.append(
             {
                 "protocol": protocol,
@@ -367,6 +373,8 @@ def collect_quick_wins(conn: sqlite3.Connection) -> List[Dict]:
                 "details": details or "",
                 "credentials_found": bool(creds_found),
                 "credential_protocols": [p for p in (cred_protocols or "").split(",") if p],
+                "severity": severity or "",
+                "observed": observed,
             }
         )
     return out
@@ -499,21 +507,7 @@ Rules
    capture proves and what needs verification.
 """
 
-QUICK_WIN_SEVERITY = {
-    "SMB_SIGNING_MISSING": ("critical", "SMB signing disabled -> NTLM relay to SMB is possible"),
-    "LDAP_SIGNING_MISSING": ("high", "LDAP signing/channel binding not enforced -> relay to LDAP"),
-    "SMBv1": ("high", "SMBv1 present -> legacy exploitation surface (EternalBlue-class)"),
-    "TLS1.0": ("medium", "TLS 1.0 in use"),
-    "SSLv2": ("high", "SSLv2 in use"),
-    "SSLv3": ("high", "SSLv3 in use (POODLE-class)"),
-    "SNMPv1": ("medium", "SNMPv1 in use -> community strings readable"),
-    "SNMPv2": ("medium", "SNMPv2c in use -> community strings readable"),
-    "LLMNR": ("medium", "LLMNR observed -> poisoning/relay of name resolution"),
-    "NETBIOS": ("medium", "NetBIOS name service observed -> poisoning surface"),
-    "MDNS": ("low", "mDNS observed"),
-    "SYSLOG": ("low", "Syslog in clear text"),
-    "TFTP": ("medium", "TFTP in use (no authentication)"),
-}
+from PufferRelay.severity import CLEARTEXT_PROTOCOLS, QUICK_WIN_SEVERITY
 
 INTERESTING_SERVICES = {
     "smb",
@@ -560,10 +554,15 @@ def build_leads(inventory: Dict) -> List[Dict]:
         if not qw["found"]:
             continue
         protocol = qw["protocol"]
+        stored_severity = qw.get("severity")
         severity, why = QUICK_WIN_SEVERITY.get(
             protocol, ("low", qw["details"] or "protocol observed")
         )
+        if stored_severity in {"critical", "high", "medium", "low"}:
+            severity = stored_severity
         evidence = {"quick_win": protocol, "details": qw["details"]}
+        if qw.get("observed"):
+            evidence["observed"] = qw["observed"]
         if qw["credentials_found"]:
             severity = "critical" if protocol in CLEARTEXT_PROTOCOLS else severity
             why += " (credentials seen in clear text)"

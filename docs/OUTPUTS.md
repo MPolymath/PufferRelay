@@ -96,3 +96,5 @@ pufferrelay -r --protocol ftp --json                  # tab-separated (machine m
 - The nmap command is a convenience string; it is `ACTIVE` if executed.
 - A capture with no quick-win scan (`-q`) still yields CRED/HASH leads; run `-q`
   to add protocol-level leads (SMB signing, cleartext services, LLMNR, ...).
+- Quick-win leads carry a stored severity and an evidence block with a hit
+  count and sample source/destination IPs.

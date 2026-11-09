@@ -102,7 +102,8 @@ Everything else follows the table above; do Tier S completely before Tier A.
 | `e885117` | #44 SMB shares/files + NTLM-inside-SMB relay fallback |
 | `bb5609c` | #57 file carving from HTTP/FTP |
 | `d6b6442` | #55 parsing speed: tshark field extraction, 6.7x parse / 159x quick wins |
-| (this commit) | #15 BloodHound Legacy JSON export from observed identities/sessions |
+| `29baabf` | #15 BloodHound Legacy JSON export from observed identities/sessions |
+| (this commit) | #39 quick-win severity + evidence in DB and lead feed |
 
 Test status: 26 pytest tests passing locally and in CI (tshark installed),
 including a synthetic-pcap end-to-end and a CLI subprocess test. Every feature

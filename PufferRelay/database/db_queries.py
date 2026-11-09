@@ -653,7 +653,7 @@ def check_unencrypted_protocols(conn):
 
     return found_protocols
 
-def update_quick_win(conn, protocol, found=True, details='', credentials_found=False, credential_protocols=None):
+def update_quick_win(conn, protocol, found=True, details='', credentials_found=False, credential_protocols=None, severity=None, evidence=None):
     """
     Update a quick win entry in the database.
     
@@ -686,16 +686,19 @@ def update_quick_win(conn, protocol, found=True, details='', credentials_found=F
             credential_protocols_str = ','.join(sorted(new_protocols))
             
             cursor.execute("""
-                UPDATE quick_wins 
-                SET found = ?, details = ?, credentials_found = ?, credential_protocols = ?
+                UPDATE quick_wins
+                SET found = ?, details = ?, credentials_found = ?, credential_protocols = ?,
+                    severity = COALESCE(?, severity), evidence = COALESCE(?, evidence)
                 WHERE protocol = ?
-            """, (found, details, credentials_found, credential_protocols_str, protocol))
+            """, (found, details, credentials_found, credential_protocols_str,
+                  severity, evidence, protocol))
         else:
             cursor.execute("""
-                UPDATE quick_wins 
-                SET found = ?, details = ?
+                UPDATE quick_wins
+                SET found = ?, details = ?, severity = COALESCE(?, severity),
+                    evidence = COALESCE(?, evidence)
                 WHERE protocol = ?
-            """, (found, details, protocol))
+            """, (found, details, severity, evidence, protocol))
         
         conn.commit()
     except sqlite3.Error as e:

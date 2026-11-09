@@ -33,7 +33,10 @@ status board.
 - [x] #15 BloodHound Legacy JSON export (users/computers/sessions observed;
       deterministic UUID identifiers; no SIDs/ACLs — documented in
       `bloodhound/README.txt`).
-- [ ] #39 quick-win severity + evidence upgrade.
+- [x] #39 quick-win severity + evidence: stored `severity`/`evidence`
+      (counts + sample source/destination IPs) in the quick_wins table and
+      surfaced in the lead feed; cleartext protocols with credentials are
+      stored as critical.
 - [ ] Tier B (network actions) with warnings: #27, #16, #13, #60.
 
 ## Known gaps
