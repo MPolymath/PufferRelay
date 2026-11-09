@@ -24,6 +24,7 @@ tshark receives `/c/...` and matches nothing. Also run with `--only` to confirm.
 Not yet — live capture is Tier B (explicit flag + warning) and not implemented.
 Use `tcpdump`/Wireshark to produce the pcap; the analysis is the same.
 
-**Why is the database in the current directory?**
-`extracted_data.db` is created in the working directory. Run from the engagement
-folder and delete it with the other artifacts when done.
+**Where is the database?**
+By default `extracted_data.db` in the working directory. Use `--db PATH` or
+`db_path` in the config file to keep it with the engagement; delete it with the
+other artifacts when done.
