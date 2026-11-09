@@ -33,6 +33,7 @@ from PufferRelay.protocols import (
     process_services,
     process_kerberos,
     process_relays,
+    process_smb,
 )
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
@@ -53,13 +54,14 @@ HANDLERS = {
     "snmp": process_snmp,
     "kerberos": process_kerberos,
     "relays": process_relays,
+    "smb": process_smb,
     "services": process_services,
     "ips": process_ips,
 }
 
 # Handlers that can yield usernames or credentials (#48).
 CREDENTIAL_HANDLERS = {"ldap", "http", "ftp", "telnet", "smtp", "imap", "pop3", "ntlm",
-                       "kerberos", "relays"}
+                       "kerberos", "relays", "smb"}
 
 
 def selected_handlers(only=None, credentials_only=False):
@@ -83,7 +85,7 @@ def selected_handlers(only=None, credentials_only=False):
     return names
 
 
-def parse_pcap(pcap_file, only=None, credentials_only=False):
+def parse_pcap(pcap_file, only=None, credentials_only=False, animate=None):
     """Parses a PCAP file and extracts data for the selected protocol handlers.
 
     Args:
@@ -101,7 +103,9 @@ def parse_pcap(pcap_file, only=None, credentials_only=False):
 
     animation_running = False
     animation_thread = None
-    if logging.getLogger().getEffectiveLevel() > logging.DEBUG:
+    if animate is None:
+        animate = logging.getLogger().getEffectiveLevel() > logging.DEBUG
+    if animate:
         update_animation, _ = show_loading_animation()
         animation_running = True
 

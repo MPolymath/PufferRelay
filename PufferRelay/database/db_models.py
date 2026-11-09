@@ -165,6 +165,20 @@ def create_database(db_path=None):
             )
         """)
 
+        # Create SMB share/file activity (issue #44)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS smb_activity (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                share TEXT,
+                file TEXT,
+                operation TEXT,
+                printer INTEGER DEFAULT 0,
+                UNIQUE(src_ip, dst_ip, share, file, operation, printer)
+            )
+        """)
+
         # Create NTLM relay candidates (issue #62)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS relay_scenarios (

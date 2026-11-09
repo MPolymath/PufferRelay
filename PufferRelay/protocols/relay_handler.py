@@ -96,6 +96,29 @@ def _get(packet, layer: str, field: str) -> str:
     return str(value) if value is not None else ""
 
 
+def _raw_has_ntlm(packet) -> bool:
+    """True when the TCP payload contains an NTLMSSP message.
+
+    tshark sometimes keeps NTLMSSP nested inside SMB2 instead of exposing a
+    top-level ``ntlmssp`` layer, so fall back to the raw bytes.
+    """
+    for layer, field in (("tcp", "tcp.payload"), ("data", "data.data")):
+        try:
+            value = getattr(packet, layer).get(field, "")
+        except (AttributeError, TypeError):
+            continue
+        if not value:
+            continue
+        text = str(value).replace(":", "").replace(" ", "")
+        try:
+            raw = bytes.fromhex(text)
+        except ValueError:
+            continue
+        if b"NTLMSSP" in raw:
+            return True
+    return False
+
+
 def _parse_flags(value: str) -> Optional[int]:
     if not value:
         return None
@@ -136,7 +159,8 @@ def process_relays(pcap_file):
                             packet, "smb2", "smb2.signing_required"
                         ).lower() in {"1", "true"}
 
-                if not hasattr(packet, "ntlmssp"):
+                has_ntlm_layer = hasattr(packet, "ntlmssp")
+                if not has_ntlm_layer and not _raw_has_ntlm(packet):
                     continue
 
                 src_ip = packet.ip.src if hasattr(packet, "ip") else ""
@@ -145,7 +169,11 @@ def process_relays(pcap_file):
                 except (AttributeError, ValueError):
                     dst_port = None
                 protocol = protocol_for_port(dst_port, hasattr(packet, "http"))
-                username = _get(packet, "ntlmssp", "ntlmssp.auth.username")
+                username = (
+                    _get(packet, "ntlmssp", "ntlmssp.auth.username")
+                    if has_ntlm_layer
+                    else ""
+                )
 
                 required = signing.get(dst_ip)
                 candidate = classify(protocol, required)

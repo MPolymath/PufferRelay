@@ -131,6 +131,14 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} SNMP records")
+        elif protocol == "smb":
+            # (src_ip, dst_ip, share, file, operation, printer)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO smb_activity
+                    (src_ip, dst_ip, share, file, operation, printer)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} SMB activity rows")
         elif protocol == "relays":
             # (src_ip, dst_ip, dst_port, protocol, username, signing, candidate)
             cursor.executemany("""
@@ -212,6 +220,8 @@ PROTOCOL_TABLES = {
     "services": ("observed_services", ["ip", "port", "service", "transport"]),
     "kerberos": ("kerberos_asrep",
                  ["username", "realm", "etype", "hash", "src_ip", "dst_ip"]),
+    "smb": ("smb_activity",
+            ["src_ip", "dst_ip", "share", "file", "operation", "printer"]),
     "relays": ("relay_scenarios",
                ["src_ip", "dst_ip", "dst_port", "protocol", "username",
                 "signing_required", "candidate"]),

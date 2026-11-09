@@ -21,6 +21,8 @@ import time
 from collections import defaultdict
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
+from PufferRelay.protocols.smb_handler import interesting_file
+
 EXPORT_SCHEMA = 1
 
 # Curated port -> service map (common pentest-relevant services). Unknown ports
@@ -394,6 +396,37 @@ def collect_relays(conn: sqlite3.Connection) -> List[Dict]:
     return out
 
 
+def collect_smb(conn: sqlite3.Connection) -> Dict:
+    """Shares and file names observed over SMB (issue #44)."""
+    if not _has_table(conn, "smb_activity"):
+        return {"shares": [], "files": []}
+    shares = []
+    files = []
+    for src, dst, share, file_name, operation, printer in _rows(
+        conn,
+        "SELECT src_ip, dst_ip, share, file, operation, printer FROM smb_activity",
+    ):
+        shares.append(
+            {
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "share": share or "",
+                "printer": bool(printer),
+            }
+        )
+        if file_name:
+            files.append(
+                {
+                    "source_ip": src or "",
+                    "destination_ip": dst or "",
+                    "share": share or "",
+                    "file": file_name,
+                    "operation": operation or "",
+                }
+            )
+    return {"shares": shares, "files": files}
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
     return {
         "hosts": collect_hosts(conn),
@@ -402,6 +435,7 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "hashes": collect_hashes(conn),
         "quick_wins": collect_quick_wins(conn),
         "relays": collect_relays(conn),
+        "smb": collect_smb(conn),
     }
 
 
@@ -661,6 +695,60 @@ def build_leads(inventory: Dict) -> List[Dict]:
                         "<wordlist> -r rules/best64.rule",
                         "active": False,
                         "warning": "Offline only; safe for the target network.",
+                    }
+                ],
+            }
+        )
+
+    # 3a-bis. SMB shares and files observed in the capture.
+    smb = inventory.get("smb", {"shares": [], "files": []})
+    share_targets = {}
+    for row in smb.get("shares", []):
+        if row["share"]:
+            share_targets.setdefault((row["destination_ip"], row["share"]), set()).add(
+                row["source_ip"]
+            )
+    for i, ((host, share), sources) in enumerate(sorted(share_targets.items()), start=1):
+        add(
+            {
+                "id": f"SMB-{i:03d}",
+                "severity": "medium",
+                "title": f"SMB share accessed: //{host}/{share}",
+                "why": "The capture shows a client accessing this share. Its content and "
+                "permissions were not tested; it is a candidate for data collection or "
+                "write-based attacks if the current credentials still work.",
+                "evidence": {"destination_ip": host, "share": share,
+                             "client_ips": sorted(s for s in sources if s)},
+                "suggested_actions": [
+                    {
+                        "intent": "List the share with in-scope credentials (scope-gated)",
+                        "command": f"smbclient -L //{host}/ -N",
+                        "active": True,
+                        "warning": "Active: contacts the SMB service. Confirm scope.",
+                    }
+                ],
+            }
+        )
+
+    for i, row in enumerate(
+        [r for r in smb.get("files", []) if interesting_file(r["file"])], start=1
+    ):
+        add(
+            {
+                "id": f"SMBFILE-{i:03d}",
+                "severity": "high",
+                "title": f"Sensitive-looking file transferred over SMB: {row['file']}",
+                "why": "The file name suggests configuration, credentials or archives. "
+                "If the capture contains the transfer, the object can be carved offline; "
+                "otherwise retrieve it with the captured credentials (scope-gated).",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the captured transfer locally (passive)",
+                        "command": "tshark -r capture.pcap -Y 'smb2.filename contains "
+                        f"\"{row['file']}\"' -T fields -e data.data",
+                        "active": False,
+                        "warning": "Reads the capture only; no traffic.",
                     }
                 ],
             }
@@ -1002,6 +1090,24 @@ def write_exports(
             f"{r['protocol']}	{r['username'] or '-'}	{signing}	{int(r['candidate'])}"
         )
     _write_text(path("relays.tsv"), relay_lines)
+
+    smb = inventory.get("smb", {"shares": [], "files": []})
+    share_lines = sorted(
+        {
+            f"{row['destination_ip']}	{row['share'] or '-'}	"
+            f"{'printer' if row['printer'] else 'share'}"
+            for row in smb.get("shares", [])
+        }
+    )
+    _write_text(path("smb-shares.txt"), share_lines)
+    file_lines = sorted(
+        {
+            f"{row['destination_ip']}	{row['share'] or '-'}	{row['file']}	"
+            f"{row['operation']}"
+            for row in smb.get("files", [])
+        }
+    )
+    _write_text(path("smb-files.txt"), file_lines)
 
     _write_json(path("summary.json"), {"inventory": inventory, "leads": leads})
     _write_json(

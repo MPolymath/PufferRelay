@@ -132,6 +132,8 @@ def test_write_exports_pack():
             "asrep-hashes.txt",
             "relay-targets.txt",
             "relays.tsv",
+            "smb-shares.txt",
+            "smb-files.txt",
             "summary.json",
             "leads.json",
             "leads.md",

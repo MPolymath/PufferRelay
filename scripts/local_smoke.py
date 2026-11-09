@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import sqlite3
 import sys
@@ -69,6 +70,20 @@ def main() -> int:
         print(f"not found: {args.pcap}")
         return 2
 
+    # Keep third-party debug chatter out of the report; it can contain paths
+    # and capture metadata. A filter is used because pyshark resets its logger
+    # level when a FileCapture is created.
+    class _NoDebug(logging.Filter):
+        def filter(self, record):
+            return record.levelno >= logging.WARNING
+
+    logging.disable(logging.DEBUG)
+    logging.getLogger().setLevel(logging.WARNING)
+    for name in ("pyshark", "FileCapture", "asyncio"):
+        logger = logging.getLogger(name)
+        logger.setLevel(logging.WARNING)
+        logger.addFilter(_NoDebug())
+
     only = args.only.split(",") if args.only else None
     with tempfile.TemporaryDirectory() as tmp:
         db_path = os.path.join(tmp, "smoke.db")
@@ -79,7 +94,10 @@ def main() -> int:
 
         started = time.time()
         data = parse_pcap(
-            args.pcap, only=only, credentials_only=args.credentials_only
+            args.pcap,
+            only=only,
+            credentials_only=args.credentials_only,
+            animate=False,
         )
         parse_seconds = time.time() - started
         process_extracted_data(data, db_path=db_path)
@@ -101,6 +119,31 @@ def main() -> int:
             except sqlite3.Error:
                 continue
         print("table_counts=" + json.dumps(counts, sort_keys=True))
+
+        # Safe field-presence aggregates (counts only, never values).
+        aggregates = {}
+        for table, column, flag in [
+            ("http_requests", "http_auth_username", "http_rows_with_auth"),
+            ("http_requests", "http_form", "http_rows_with_form"),
+            ("ldap_requests", "ldap_simple", "ldap_rows_with_password"),
+            ("netbios_requests", "hostname", "netbios_rows_with_hostname"),
+            ("kerberos_asrep", "hash", "asrep_rows"),
+            ("relay_scenarios", "candidate", "relay_candidate_rows"),
+        ]:
+            try:
+                cursor.execute(
+                    f"SELECT COUNT(*) FROM {table} WHERE {column} IS NOT NULL "
+                    f"AND {column} != '' AND {column} != 'N/A' AND {column} != 0"
+                )
+                aggregates[flag] = cursor.fetchone()[0]
+            except sqlite3.Error:
+                continue
+        try:
+            cursor.execute("SELECT COUNT(*) FROM quick_wins WHERE found = 1")
+            aggregates["quick_wins_found"] = cursor.fetchone()[0]
+        except sqlite3.Error:
+            pass
+        print("field_aggregates=" + json.dumps(aggregates, sort_keys=True))
 
         inventory = collect_inventory(conn)
         leads = build_leads(inventory)
