@@ -9,7 +9,11 @@ import pytest
 from PufferRelay.database.db_models import create_database
 from PufferRelay.database.db_queries import insert_into_database
 from PufferRelay.export import write_exports
-from PufferRelay.protocols.relay_handler import classify, protocol_for_port
+from PufferRelay.protocols.relay_handler import (
+    classify,
+    protocol_for_port,
+    smb_signing_missing_hosts,
+)
 
 
 def test_classify_and_ports():
@@ -26,6 +30,17 @@ def test_classify_and_ports():
     assert protocol_for_port(8080) == "http"
     assert protocol_for_port(80) == "http"
     assert protocol_for_port(12345) == "unknown"
+
+
+def test_smb_signing_missing_hosts():
+    rows = [
+        ("a", "10.0.0.40", 445, "smb", "u", 0, 1),
+        ("a", "10.0.0.50", 445, "smb", "u", 1, 0),
+        ("a", "10.0.0.10", 389, "ldap", "u", "", 1),
+        ("a", "10.0.0.60", 445, "smb", "u", "", 1),
+    ]
+    assert smb_signing_missing_hosts(rows) == ["10.0.0.40"]
+    assert smb_signing_missing_hosts([]) == []
 
 
 def test_relay_rows_flow_to_export():

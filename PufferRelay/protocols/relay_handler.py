@@ -68,6 +68,24 @@ def protocol_for_port(port: Optional[int], has_http: bool = False) -> str:
     return "unknown"
 
 
+def smb_signing_missing_hosts(rows) -> list:
+    """Destination IPs where NTLM was seen over SMB with signing not required.
+
+    ``rows`` uses the process_relays() tuple shape:
+    (src, dst, port, protocol, username, signing_required, candidate)
+    with signing_required 0/1/"" .
+    """
+    hosts = set()
+    for row in rows:
+        try:
+            _src, dst, _port, protocol, _user, signing, _candidate = row
+        except (TypeError, ValueError):
+            continue
+        if protocol == "smb" and str(signing) == "0":
+            hosts.add(str(dst))
+    return sorted(hosts)
+
+
 def _get(packet, layer: str, field: str) -> str:
     try:
         value = getattr(packet, layer).get(field, "")

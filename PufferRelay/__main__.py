@@ -39,6 +39,7 @@ from PufferRelay.database.db_queries import (
     fetch_protocol,
     protocol_headers,
     process_extracted_data,
+    update_quick_win,
 )
 from PufferRelay.protocols.quick_wins import analyze_quick_wins
 from PufferRelay.logger import setup_logger
@@ -226,6 +227,19 @@ def main():
                     credentials_only=args.credentials_only,
                 )
                 process_extracted_data(parsed_data)
+
+                # Relay findings feed the SMB-signing quick win so it shows up
+                # in every view (table, report, agent feed).
+                from PufferRelay.protocols.relay_handler import smb_signing_missing_hosts
+
+                signing_missing = smb_signing_missing_hosts(parsed_data.get("relays", []))
+                if signing_missing:
+                    update_quick_win(
+                        conn,
+                        "SMB_SIGNING_MISSING",
+                        found=True,
+                        details="SMB signing not required: " + ", ".join(signing_missing),
+                    )
 
                 # `-f capture -q` adds the quick-win scan to a handler run.
                 if args.quick_wins is True:
