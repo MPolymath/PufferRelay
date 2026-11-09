@@ -608,6 +608,165 @@ def collect_asrepcatcher(conn: sqlite3.Connection) -> List[Dict]:
     return out
 
 
+def collect_kerberoast(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "kerberoast"):
+        return out
+    for user, realm, spn, etype, digest, src, dst, confidence in _rows(
+        conn,
+        "SELECT username, realm, spn, etype, hash, src_ip, dst_ip, confidence "
+        "FROM kerberoast",
+    ):
+        out.append(
+            {
+                "username": user or "",
+                "realm": realm or "",
+                "spn": spn or "",
+                "etype": int(etype or 0),
+                "hash": digest or "",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "confidence": confidence or "candidate",
+            }
+        )
+    return out
+
+
+def collect_tokens(conn: sqlite3.Connection) -> List[Dict]:
+    """HTTP tokens; the full secret stays in the database only."""
+    out = []
+    if not _has_table(conn, "http_tokens"):
+        return out
+    for row in _rows(
+        conn,
+        "SELECT kind, severity, host, path, header, fingerprint, principal, "
+        "expires, src_ip, dst_ip FROM http_tokens",
+    ):
+        kind, severity, host, path, header, mark, principal, expires, src, dst = row
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "high",
+                "host": host or "",
+                "path": path or "",
+                "header": header or "",
+                "fingerprint": mark or "",
+                "principal": principal or "",
+                "expires": expires or "",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+            }
+        )
+    return out
+
+
+def collect_coercions(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "coercion_events"):
+        return out
+    for kind, severity, src, dst, pipe, uuid, opnum, unc, evidence in _rows(
+        conn,
+        "SELECT kind, severity, src_ip, dst_ip, pipe, interface_uuid, opnum, unc, "
+        "evidence FROM coercion_events",
+    ):
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "high",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "pipe": pipe or "",
+                "interface": uuid or "",
+                "opnum": opnum or "",
+                "unc": unc or "",
+                "evidence": parsed,
+            }
+        )
+    return out
+
+
+def collect_adcs(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "adcs_events"):
+        return out
+    for kind, severity, src, dst, host, uri, principal, realm, evidence in _rows(
+        conn,
+        "SELECT kind, severity, src_ip, dst_ip, host, uri, principal, realm, "
+        "evidence FROM adcs_events",
+    ):
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "medium",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "host": host or "",
+                "uri": uri or "",
+                "principal": principal or "",
+                "realm": realm or "",
+                "evidence": parsed,
+            }
+        )
+    return out
+
+
+def collect_ipv6(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "ipv6_events"):
+        return out
+    for kind, severity, src, dst, detail, evidence in _rows(
+        conn,
+        "SELECT kind, severity, src_ip, dst_ip, detail, evidence FROM ipv6_events",
+    ):
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "high",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "detail": detail or "",
+                "evidence": parsed,
+            }
+        )
+    return out
+
+
+def collect_database_creds(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "database_creds"):
+        return out
+    for protocol, src, dst, user, secret, kind, mark, server in _rows(
+        conn,
+        "SELECT protocol, src_ip, dst_ip, username, secret, kind, fingerprint, "
+        "server FROM database_creds",
+    ):
+        out.append(
+            {
+                "protocol": protocol or "",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "username": user or "",
+                "secret": secret or "",
+                "kind": kind or "",
+                "fingerprint": mark or "",
+                "server": server or "",
+            }
+        )
+    return out
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
     return {
         "hosts": collect_hosts(conn),
@@ -622,6 +781,12 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "wsus": collect_wsus(conn),
         "dns": collect_dns(conn),
         "asrepcatcher": collect_asrepcatcher(conn),
+        "kerberoast": collect_kerberoast(conn),
+        "tokens": collect_tokens(conn),
+        "coercions": collect_coercions(conn),
+        "adcs": collect_adcs(conn),
+        "ipv6": collect_ipv6(conn),
+        "database_credentials": collect_database_creds(conn),
     }
 
 
@@ -875,6 +1040,190 @@ def build_leads(inventory: Dict) -> List[Dict]:
                         "active": False,
                         "warning": "Documentation only.",
                     },
+                ],
+            }
+        )
+
+    # 3c. Kerberoasting: offline-crackable service tickets.
+    for i, row in enumerate(inventory.get("kerberoast", []), start=1):
+        has_hash = bool(row.get("hash"))
+        mode = {23: 13100, 17: 19600, 18: 19700}.get(row.get("etype"), 13100)
+        add(
+            {
+                "id": f"KERBEROAST-{i:03d}" if has_hash else f"KERBEROASTCAND-{i:03d}",
+                "severity": "critical" if has_hash else "high",
+                "title": (
+                    f"Kerberoastable service ticket for {row['spn']}"
+                    if has_hash
+                    else f"Kerberoasting candidate: {row['username']} -> {row['spn']}"
+                ),
+                "why": (
+                    "A TGS-REP for a service account is encrypted with that "
+                    "account's password hash; it can be cracked offline."
+                    if has_hash
+                    else "A service ticket was requested for an SPN without a "
+                    "parsed TGS-REP; verify the exchange before acting."
+                ),
+                "evidence": {
+                    "username": row["username"],
+                    "realm": row["realm"],
+                    "spn": row["spn"],
+                    "etype": row["etype"],
+                    "source_ip": row["source_ip"],
+                    "destination_ip": row["destination_ip"],
+                    "hash": row["hash"],
+                },
+                "suggested_actions": [
+                    {
+                        "intent": "Crack the service ticket offline (no traffic)",
+                        "command": f"hashcat -m {mode} kerberoast-hashes.txt <wordlist>",
+                        "active": False,
+                        "warning": "Offline only; the hash is a live secret.",
+                    }
+                ]
+                if has_hash
+                else [],
+            }
+        )
+
+    # 3d. HTTP bearer/JWT/API tokens (fingerprint only in the lead feed).
+    for i, row in enumerate(inventory.get("tokens", []), start=1):
+        add(
+            {
+                "id": f"TOKEN-{i:03d}",
+                "severity": row["severity"],
+                "title": f"{row['kind']} token observed for {row['host'] or 'unknown host'}",
+                "why": "A reusable bearer/API secret was sent over HTTP. It may "
+                "grant the same access as the user who sent it.",
+                "evidence": {
+                    "kind": row["kind"],
+                    "host": row["host"],
+                    "path": row["path"],
+                    "header": row["header"],
+                    "fingerprint": row["fingerprint"],
+                    "principal": row["principal"],
+                    "expires": row["expires"],
+                    "source_ip": row["source_ip"],
+                    "destination_ip": row["destination_ip"],
+                },
+                "suggested_actions": [
+                    {
+                        "intent": "Replay the token against the same service (scope-gated)",
+                        "command": "curl -H 'Authorization: Bearer <token>' "
+                        f"https://{row['host'] or '<host>'}{row['path'] or '/'}",
+                        "active": True,
+                        "warning": "Active: uses a live secret. Confirm scope; "
+                        "tokens may be logged or rotate on use.",
+                    }
+                ],
+            }
+        )
+
+    # 3e. Coerced authentication over SMB/RPC.
+    for i, row in enumerate(inventory.get("coercions", []), start=1):
+        add(
+            {
+                "id": f"COERCE-{i:03d}",
+                "severity": row["severity"],
+                "title": f"{row['kind']} coercion attempt",
+                "why": "The victim was told to authenticate to "
+                f"{row['unc'] or 'an attacker-controlled host'}; this is the "
+                "first half of an NTLM relay chain.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Check whether a relay target accepted the authentication",
+                        "command": "look for a matching NTLM exchange to the UNC "
+                        "host in the capture; then review relay-targets.txt",
+                        "active": False,
+                        "warning": "Read-only analysis.",
+                    }
+                ],
+            }
+        )
+
+    # 3f. ADCS enrollment / PKINIT.
+    for i, row in enumerate(inventory.get("adcs", []), start=1):
+        add(
+            {
+                "id": f"ADCS-{i:03d}",
+                "severity": row["severity"],
+                "title": f"ADCS {row['kind']} activity"
+                + (f" to {row['host']}" if row["host"] else ""),
+                "why": "Certificate enrollment or PKINIT logon was observed. "
+                "ADCS is a primary AD escalation path (ESC1-ESC8).",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the enrollment request and template",
+                        "command": "inspect the capture around this flow; check "
+                        "the CA/template references in the lead",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3g. IPv6/DHCPv6/ADIDNS takeover.
+    for i, row in enumerate(inventory.get("ipv6", []), start=1):
+        add(
+            {
+                "id": f"IPV6-{i:03d}",
+                "severity": row["severity"],
+                "title": f"{row['kind']} on the segment",
+                "why": "A rogue DHCPv6/RA DNS source or ADIDNS dynamic update "
+                "can redirect name resolution and harvest credentials.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Identify the host offering DNS and compare with "
+                        "the known resolver",
+                        "command": "review ipv6.tsv and the DHCPv6/RA frames in the capture",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3h. Database credentials and crackable responses.
+    for i, row in enumerate(inventory.get("database_credentials", []), start=1):
+        cleartext = row["kind"] in {"redis-cleartext", "pg-cleartext"}
+        add(
+            {
+                "id": f"DB-{i:03d}",
+                "severity": "critical" if cleartext else "high",
+                "title": f"{row['protocol']} credential material"
+                + (f" for {row['username']}" if row["username"] else ""),
+                "why": (
+                    "The database password was sent in clear text."
+                    if cleartext
+                    else "A database authentication response was captured; it "
+                    "may be crackable offline."
+                ),
+                "evidence": {
+                    "protocol": row["protocol"],
+                    "username": row["username"],
+                    "kind": row["kind"],
+                    "source_ip": row["source_ip"],
+                    "destination_ip": row["destination_ip"],
+                    "server": row["server"],
+                },
+                "suggested_actions": [
+                    {
+                        "intent": "Reuse the credential against the database (scope-gated)",
+                        "command": f"{row['protocol']} client to "
+                        f"{row['destination_ip'] or '<host>'} with the captured secret",
+                        "active": True,
+                        "warning": "Active: authenticates to the database. Confirm scope.",
+                    }
+                ]
+                if cleartext
+                else [
+                    {
+                        "intent": "Crack the response offline",
+                        "command": "hashcat with the matching database mode",
+                        "active": False,
+                    }
                 ],
             }
         )
@@ -1476,6 +1825,62 @@ def write_exports(
                 for row in catcher
             }
         ),
+    )
+
+    kerberoast = inventory.get("kerberoast", [])
+    _write_text(
+        path("kerberoast-hashes.txt"),
+        [row["hash"] for row in kerberoast if row["hash"]],
+    )
+    _write_text(
+        path("tokens.tsv"),
+        ["kind	severity	host	path	header	fingerprint	principal	expires	src	dst"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['host'] or '-'}	"
+            f"{row['path'] or '-'}	{row['header'] or '-'}	{row['fingerprint']}	"
+            f"{row['principal'] or '-'}	{row['expires'] or '-'}	"
+            f"{row['source_ip'] or '-'}	{row['destination_ip'] or '-'}"
+            for row in inventory.get("tokens", [])
+        ],
+    )
+    _write_text(
+        path("coercions.tsv"),
+        ["kind	severity	src	dst	pipe	opnum	unc"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['pipe'] or '-'}	"
+            f"{row['opnum'] or '-'}	{row['unc'] or '-'}"
+            for row in inventory.get("coercions", [])
+        ],
+    )
+    _write_text(
+        path("adcs.tsv"),
+        ["kind	severity	src	dst	host	uri	principal	realm"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['host'] or '-'}	"
+            f"{row['uri'] or '-'}	{row['principal'] or '-'}	{row['realm'] or '-'}"
+            for row in inventory.get("adcs", [])
+        ],
+    )
+    _write_text(
+        path("ipv6.tsv"),
+        ["kind	severity	src	dst	detail"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['detail']}"
+            for row in inventory.get("ipv6", [])
+        ],
+    )
+    _write_text(
+        path("db-creds.tsv"),
+        ["protocol	src	dst	username	secret	kind	server"]
+        + [
+            f"{row['protocol']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['username'] or '-'}	"
+            f"{row['secret'] or '-'}	{row['kind']}	{row['server'] or '-'}"
+            for row in inventory.get("database_credentials", [])
+        ],
     )
 
     # Carved file objects (issue #57). These are client data: they stay in the

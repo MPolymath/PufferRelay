@@ -82,6 +82,13 @@ PufferRelay/
     wsus_handler.py      WSUS/Windows Update endpoints
     dns_handler.py       DNS queries/answers (name↔IP map)
     asrepcatcher.py      ASRepCatcher-compatible ARP/Kerberos pattern
+    kerberoast.py        TGS-REP DER walk + hashcat lines
+    http_tokens.py       bearer/JWT/API tokens (fingerprinted)
+    coercion.py          MS-EFSRPC/RPRN/DFSNM/FSRVP coercion calls
+    adcs.py              ADCS enrollment + PKINIT
+    ipv6_adidns.py       DHCPv6/RA DNS takeover + ADIDNS updates
+    database_auth.py     Redis/MySQL/PostgreSQL auth material
+    smb_objects.py       tshark SMB object export -> captured_files
     quick_wins.py        regex sweep over every packet for "quick win" flags
   database/
     db_models.py         CREATE TABLE IF NOT EXISTS + quick_wins seed
@@ -90,7 +97,7 @@ PufferRelay/
   utils/
     display.py           Rich tables/panels
     loading_animation.py spinner + READY banner
-  tests/                 pytest suite (95 tests: pure, DB, e2e pcap, CLI, relay)
+  tests/                 pytest suite (104 tests: pure, DB, e2e pcap, CLI, relay)
 ```
 
 Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->

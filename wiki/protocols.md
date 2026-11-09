@@ -90,6 +90,61 @@ narrow: a capture proves traffic, not intent.
 - Limit: one answer per row when a response carries several records; DoH/DoT
   traffic is not DNS and is not parsed here.
 
+## Kerberoasting
+- TGS-REQ (msg 12) / TGS-REP (msg 13) fields: account, realm, SPN, etype.
+  The encrypted ticket is not a tshark field, so the handler reassembles the
+  TCP/UDP payload and walks the KDC-REP DER to the Ticket enc-part.
+- Proves: a service ticket encrypted with the service account's password hash;
+  format `$krb5tgs$23|17|18$…` for hashcat 13100/19600/19700. A burst of ≥5
+  distinct SPNs from one principal is reported as a candidate even without a
+  parsed reply.
+- Limit: fragmented/segmented Kerberos with no reassembly, or a non-DER blob,
+  yields a candidate row only.
+
+## HTTP tokens
+- Request/response headers and body: `Authorization: Bearer`, `X-Vault-Token`,
+  `PRIVATE-TOKEN`, `X-Api-Key`, session cookies; JWT/GitHub/GitLab/AWS/Slack/
+  Stripe patterns; JSON `access_token`/`api_key` keys.
+- Proves: a reusable secret was sent. JWTs are decoded (claims only; signature
+  is not verified). Exports carry a fingerprint by default; the full value
+  stays in the local database.
+- Limit: TLS is opaque; header values split across TCP segments may be missed.
+
+## RPC coercion
+- `dcerpc` binds and requests on the MS-EFSRPC, MS-RPRN, MS-DFSNM and MS-FSRVP
+  interfaces, plus the `efsrpc`/`spoolss`/`netdfs` named pipes; UNC paths are
+  extracted from the reassembled call data.
+- Proves: a coercion attempt (the first half of an NTLM relay chain).
+- Limit: only bind/request frames; encrypted RPC is opaque.
+
+## ADCS / PKINIT
+- HTTP `/certsrv`-style enrollment (NTLM or certificate auth) and Kerberos
+  PKINIT AS-REQ (`padata_type == 16`), with the principal/realm.
+- Proves: certificate enrollment or certificate logon was observed.
+- Limit: template names/attributes are often not visible; DCOM-only enrollment
+  is detected by bind, not by the requested template.
+
+## IPv6 / DHCPv6 / ADIDNS
+- DHCPv6 Advertise/Reply DNS servers, ICMPv6 RA RDNSS/DNSSL, and DNS UPDATE
+  (opcode 5) records.
+- Proves: a rogue DNS source on the segment and/or dynamic AD DNS updates; one
+  host doing both is raised to critical.
+- Limit: no baseline of the legitimate resolver, so the lead asks the operator
+  to confirm.
+
+## Database authentication
+- Redis RESP `AUTH` (clear text), MySQL login user/response, PostgreSQL startup
+  parameters, cleartext password auth and MD5/SASL mechanism.
+- Proves: reusable database material or an offline-crackable response.
+- Limit: `mysql_native_password` scrambles and SCRAM proofs need the matching
+  hashcat mode; MSSQL stays with the NTLM handler.
+
+## SMB objects
+- tshark `--export-objects smb,<dir>` writes reassembled SMB file objects; the
+  handler reads them into `captured_files` with sha256, type and size caps
+  (8 MiB/object, 16 MiB/capture).
+- Proves: the file content, not just the name seen in CREATE frames.
+
 ## Files
 - HTTP response bodies and FTP-DATA objects, sha256, size, safe name.
 - Limit: objects split across many TCP segments depend on tshark reassembly.

@@ -198,6 +198,65 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} DNS events")
+        elif protocol == "kerberoast":
+            # (username, realm, spn, etype, hash, src_ip, dst_ip, confidence)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO kerberoast
+                    (username, realm, spn, etype, hash, src_ip, dst_ip, confidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} Kerberoast rows")
+        elif protocol == "httptokens":
+            # (kind, severity, host, path, header, token, fingerprint,
+            #  principal, expires, src_ip, dst_ip)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO http_tokens
+                    (kind, severity, host, path, header, token, fingerprint,
+                     principal, expires, src_ip, dst_ip)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} HTTP tokens")
+        elif protocol == "coercion":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO coercion_events
+                    (kind, severity, src_ip, dst_ip, pipe, interface_uuid,
+                     opnum, unc, evidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} coercion events")
+        elif protocol == "adcs":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO adcs_events
+                    (kind, severity, src_ip, dst_ip, host, uri, principal,
+                     realm, evidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} ADCS events")
+        elif protocol == "ipv6":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO ipv6_events
+                    (kind, severity, src_ip, dst_ip, detail, evidence)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} IPv6/ADIDNS events")
+        elif protocol == "dbcreds":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO database_creds
+                    (protocol, src_ip, dst_ip, username, secret, kind,
+                     fingerprint, server)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} database credentials")
+        elif protocol == "smbobjects":
+            # Same tuple shape as "files": (protocol, src, dst, filename,
+            # content_type, size, sha256, data)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO captured_files
+                    (protocol, src_ip, dst_ip, filename, content_type, size,
+                     sha256, data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} SMB objects")
         elif protocol == "services":
             # (ip, port, service, transport) observed in the capture
             cursor.executemany("""
@@ -280,6 +339,25 @@ PROTOCOL_TABLES = {
     "asrepcatcher": ("asrepcatcher_findings",
                      ["kind", "severity", "client_ip", "attacker_ip", "kdc_ip",
                       "username", "realm", "summary"]),
+    "kerberoast": ("kerberoast",
+                   ["username", "realm", "spn", "etype", "hash", "src_ip",
+                    "dst_ip", "confidence"]),
+    "httptokens": ("http_tokens",
+                   ["kind", "severity", "host", "path", "header", "fingerprint",
+                    "principal", "expires", "src_ip", "dst_ip"]),
+    "coercion": ("coercion_events",
+                 ["kind", "severity", "src_ip", "dst_ip", "pipe", "opnum", "unc"]),
+    "adcs": ("adcs_events",
+             ["kind", "severity", "src_ip", "dst_ip", "host", "uri", "principal",
+              "realm"]),
+    "ipv6": ("ipv6_events",
+             ["kind", "severity", "src_ip", "dst_ip", "detail"]),
+    "dbcreds": ("database_creds",
+                ["protocol", "src_ip", "dst_ip", "username", "secret", "kind",
+                 "fingerprint", "server"]),
+    "smbobjects": ("captured_files",
+                   ["protocol", "src_ip", "dst_ip", "filename", "content_type",
+                    "size", "sha256"]),
 }
 
 

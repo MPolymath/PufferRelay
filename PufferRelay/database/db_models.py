@@ -263,6 +263,95 @@ def create_database(db_path=None):
             )
         """)
 
+        # Kerberoasting, tokens, coercion, ADCS, IPv6/ADIDNS, database auth.
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS kerberoast (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT,
+                realm TEXT,
+                spn TEXT,
+                etype INTEGER,
+                hash TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                confidence TEXT,
+                UNIQUE(username, realm, spn, etype, hash, confidence)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS http_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                host TEXT,
+                path TEXT,
+                header TEXT,
+                token TEXT,
+                fingerprint TEXT,
+                principal TEXT,
+                expires TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                UNIQUE(kind, fingerprint, host, src_ip)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS coercion_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                pipe TEXT,
+                interface_uuid TEXT,
+                opnum TEXT,
+                unc TEXT,
+                evidence TEXT,
+                UNIQUE(kind, src_ip, dst_ip, unc)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS adcs_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                host TEXT,
+                uri TEXT,
+                principal TEXT,
+                realm TEXT,
+                evidence TEXT,
+                UNIQUE(kind, src_ip, dst_ip, uri, principal)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ipv6_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                detail TEXT,
+                evidence TEXT,
+                UNIQUE(kind, src_ip, dst_ip, detail)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS database_creds (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                protocol TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                username TEXT,
+                secret TEXT,
+                kind TEXT,
+                fingerprint TEXT,
+                server TEXT,
+                UNIQUE(protocol, src_ip, dst_ip, username, fingerprint)
+            )
+        """)
+
         # ASRepCatcher-compatible Kerberos/ARP activity (passive detection).
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS asrepcatcher_findings (

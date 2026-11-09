@@ -74,6 +74,12 @@ Rules an agent must follow when consuming it:
 | `smb-files.txt` | host, share, file name, operation | data accessed over SMB |
 | `dns.txt` | query, type, answer, src, dst | passive name↔IP map |
 | `asrepcatcher.txt` | kind, severity, client, attacker, KDC, user, realm, summary | Kerberos attack pattern; leads carry the repo link |
+| `kerberoast-hashes.txt` | hashcat `$krb5tgs$…` lines | offline cracking (13100/19600/19700) |
+| `tokens.tsv` | kind, host, path, header, fingerprint, principal, expiry | token inventory; raw secrets stay in the DB |
+| `coercions.tsv` | interface, src/dst, pipe, opnum, UNC | relay-chain start |
+| `adcs.tsv` | enrollment/PKINIT, host, URI, principal | ADCS abuse review |
+| `ipv6.tsv` | DHCPv6/RA DNS, ADIDNS updates | rogue DNS / takeover |
+| `db-creds.tsv` | protocol, src/dst, user, secret/response | database access |
 | `files.tsv` | sha256, size, type, protocol, src, dst, name, path | index of carved objects |
 | `files/` | the carved objects themselves | **client data**, local only |
 | `bloodhound/users.json`, `computers.json` | SharpHound Legacy JSON built from observed users/hosts/sessions | import as leads (no SIDs/ACLs) |

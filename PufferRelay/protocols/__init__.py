@@ -40,6 +40,13 @@ from .nac_handler import process_nac
 from .wsus_handler import process_wsus
 from .dns_handler import process_dns
 from .asrepcatcher import process_asrepcatcher
+from .kerberoast import process_kerberoast
+from .http_tokens import process_http_tokens
+from .coercion import process_coercion
+from .adcs import process_adcs
+from .ipv6_adidns import process_ipv6_adidns
+from .database_auth import process_database_auth
+from .smb_objects import process_smb_objects
 
 __all__ = [
     'process_ldap',
@@ -61,5 +68,12 @@ __all__ = [
     'process_nac',
     'process_wsus',
     'process_dns',
-    'process_asrepcatcher'
+    'process_asrepcatcher',
+    'process_kerberoast',
+    'process_http_tokens',
+    'process_coercion',
+    'process_adcs',
+    'process_ipv6_adidns',
+    'process_database_auth',
+    'process_smb_objects'
 ]

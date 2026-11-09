@@ -39,6 +39,13 @@ from PufferRelay.protocols import (
     process_wsus,
     process_dns,
     process_asrepcatcher,
+    process_kerberoast,
+    process_http_tokens,
+    process_coercion,
+    process_adcs,
+    process_ipv6_adidns,
+    process_database_auth,
+    process_smb_objects,
 )
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
@@ -67,13 +74,21 @@ HANDLERS = {
     "wsus": process_wsus,
     "dns": process_dns,
     "asrepcatcher": process_asrepcatcher,
+    "kerberoast": process_kerberoast,
+    "httptokens": process_http_tokens,
+    "coercion": process_coercion,
+    "adcs": process_adcs,
+    "ipv6": process_ipv6_adidns,
+    "dbcreds": process_database_auth,
+    "smbobjects": process_smb_objects,
     "services": process_services,
     "ips": process_ips,
 }
 
 # Handlers that can yield usernames or credentials (#48).
 CREDENTIAL_HANDLERS = {"ldap", "http", "ftp", "telnet", "smtp", "imap", "pop3", "ntlm",
-                       "kerberos", "relays", "smb", "files", "nac"}
+                       "kerberos", "relays", "smb", "files", "nac", "httptokens",
+                       "dbcreds", "kerberoast", "asrepcatcher", "smbobjects"}
 
 
 def selected_handlers(only=None, credentials_only=False):

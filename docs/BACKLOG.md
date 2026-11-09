@@ -31,18 +31,26 @@ status board.
   diverted crackable AS-REP; critical when both overlap; leads and
   `asrepcatcher.txt` link <https://github.com/Yaxxine7/ASRepCatcher>.
 
-### Proposed detections from the attack library (drafts, not filed yet)
+### Detections from the attack library (issues #64-#71)
 
-Full issue bodies: `../attack-library/pufferrelay-issues/`.
+Issue bodies: `../attack-library/pufferrelay-issues/` (filed as #64-#71).
 
-- [ ] Kerberoasting: TGS-REP hash extraction (hashcat 13100/19600/19700).
-- [ ] RPC coercion: MS-EFSRPC / MS-RPRN / MS-DFSNM / MS-FSRVP over SMB pipes.
-- [ ] DHCPv6 / IPv6 RA takeover and ADIDNS dynamic-update abuse.
-- [ ] ADCS enrollment (HTTP/DCOM, ESC8) and PKINIT AS-REQ detection.
-- [ ] SCCM/MECM management-point, distribution-point and client-push traffic.
-- [ ] Database auth material: MySQL, PostgreSQL, Redis (MSSQL via NTLM).
-- [ ] HTTP bearer/JWT/API tokens (Vault, GitLab, GitHub, AWS) with redaction.
-- [ ] LLM/MCP/vector-DB endpoints, API keys and tool-call metadata.
+- [x] #64 Kerberoasting: TGS-REP DER walk + hashcat 13100/19600/19700, plus
+      burst candidates (`kerberoast-hashes.txt`, `KERBEROAST-*`).
+- [x] #65 RPC coercion: MS-EFSRPC / MS-RPRN / MS-DFSNM / MS-FSRVP binds and
+      UNC extraction (`coercions.tsv`, `COERCE-*`).
+- [x] #66 DHCPv6 / IPv6 RA takeover and ADIDNS dynamic updates
+      (`ipv6.tsv`, `IPV6-*`, combined critical finding).
+- [x] #67 ADCS enrollment (HTTP `/certsrv`, NTLM) and PKINIT AS-REQ
+      (`adcs.tsv`, `ADCS-*`).
+- [ ] #68 SCCM/MECM management-point, distribution-point and client-push traffic.
+- [x] #69 Database auth material: Redis cleartext, MySQL response, PostgreSQL
+      parameters/password (`db-creds.tsv`, `DB-*`).
+- [x] #70 HTTP bearer/JWT/API tokens (Vault, GitLab, GitHub, AWS) with
+      fingerprint-only exports (`tokens.tsv`, `TOKEN-*`).
+- [ ] #71 LLM/MCP/vector-DB endpoints, API keys and tool-call metadata.
+- [x] #57 extension: SMB object carving via tshark `--export-objects`, feeding
+      `captured_files` with sha256 and size caps.
 - [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM

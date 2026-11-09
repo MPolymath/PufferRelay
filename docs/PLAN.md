@@ -110,8 +110,9 @@ Everything else follows the table above; do Tier S completely before Tier A.
 | (this commit) | #27 live capture, #16 local recording relay, #13 ARP/relay command generator, #60 serve-me — all opt-in with warning + authorisation |
 | (next commit) | #11/#59 DNS visibility and host enrichment; #40 `-r --ip/--user/--has-creds/--table/--limit` filters |
 | (this commit) | ASRepCatcher-compatible detection (ARP + Kerberos relay shape) with repo link in every lead |
+| (next commit) | Kerberoasting, HTTP tokens, RPC coercion, ADCS/PKINIT, IPv6/DHCPv6/ADIDNS, database auth, SMB object carving (issues #64-#67, #69, #70) |
 
-Test status: 95 pytest tests passing locally and in CI (tshark installed),
+Test status: 104 pytest tests passing locally and in CI (tshark installed),
 including synthetic-pcap end-to-end, CLI subprocess, loopback relay and
 live-capture command-construction tests. Passive analysis is the default;
 active modes (`--live`, `--proxy`) print a red warning and require explicit
