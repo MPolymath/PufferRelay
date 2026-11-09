@@ -26,6 +26,14 @@ mirror) and now wants to know *what can I attack next, with what command*.
    - print a conspicuous warning (Rich panel, red) that states what will be
      sent, to whom, and that it is active traffic,
    - be listed in `docs/PLAN.md` under Tier B with its risk.
+
+   Implemented Tier B surface: `live.py` (`--live IFACE --bpf FILTER`,
+   `--duration`, `--confirm-authorized`, `--keep-live-capture`), `proxy.py`
+   (`--proxy --proxy-target HOST:PORT`), and the text-only generators
+   `commands.py` (`--commands`, `--serveme`). The first two print the red
+   warning and then require `authorized` interactively (or
+   `--confirm-authorized`); the generators only write files and never execute
+   anything. Keep this contract when adding new active flags.
 3. **Outputs must be portable.** Every finding is available as:
    - a stable, plain-text/CSV/JSON file (no ANSI, no wrapping),
    - a one-screen copy-paste block (commands or values),
@@ -54,6 +62,10 @@ PufferRelay/
   pcap_processing/
     pcap_parser.py       handler registry + --only/--credentials-only filters
   tshark_fields.py       one-pass `tshark -T fields` extraction (fast path)
+  live.py                #27 live capture (opt-in, warned in __main__)
+  proxy.py               #16 local TCP relay + JSONL recording (opt-in)
+  commands.py            #13/#60 text-only command generators
+  export.py              inventories + leads.json/leads.md/agent-prompt.md
   protocols/
     fields_handlers.py   field-based implementations of the protocol handlers
     helpers.py           shared HTTP/NetBIOS/SMB/relay/Kerberos logic
@@ -69,7 +81,7 @@ PufferRelay/
   utils/
     display.py           Rich tables/panels
     loading_animation.py spinner + READY banner
-  tests/                 pytest (currently empty; fill them)
+  tests/                 pytest suite (79 tests: pure, DB, e2e pcap, CLI, relay)
 ```
 
 Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->

@@ -106,9 +106,11 @@ Everything else follows the table above; do Tier S completely before Tier A.
 | `14d9e95` | #39 quick-win severity + evidence in DB and lead feed |
 | `9848b43` | wiki/ source pages; #30 NAC/802.1X and #14 WSUS detection |
 | `b48a82a` | #45 ETA/countdown and #19 JSON config with CLI/env overrides |
-| (this commit) | #53 cleanup: legacy pyshark handlers removed, helpers module |
+| `458b94c` | #53 cleanup: legacy pyshark handlers removed, helpers module |
+| (this commit) | #27 live capture, #16 local recording relay, #13 ARP/relay command generator, #60 serve-me — all opt-in with warning + authorisation |
 
-Test status: 26 pytest tests passing locally and in CI (tshark installed),
-including a synthetic-pcap end-to-end and a CLI subprocess test. Every feature
-above is passive; the only active commands are text suggestions in leads,
-flagged `active: true` with scope warnings.
+Test status: 79 pytest tests passing locally and in CI (tshark installed),
+including synthetic-pcap end-to-end, CLI subprocess, loopback relay and
+live-capture command-construction tests. Passive analysis is the default;
+active modes (`--live`, `--proxy`) print a red warning and require explicit
+authorisation, while `--commands`/`--serveme` write text only.

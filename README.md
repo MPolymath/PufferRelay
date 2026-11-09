@@ -74,6 +74,23 @@ pufferrelay -r --creds <br>
 pufferrelay -r --inventory <br>
 pufferrelay -r --protocol ftp,ntlm <br>
 
+#### Active modes (opt-in — these send packets)
+Every active mode prints a red warning and requires you to type `authorized`
+(or pass `--confirm-authorized` when you already have written scope).
+```bash
+# Live capture, analysed like a pcap, temp file deleted afterwards
+pufferrelay --live eth0 --bpf "port 445" --duration 120
+
+# Local TCP relay to one target, both directions recorded as JSONL
+pufferrelay --proxy --proxy-target 10.0.0.10:445 --duration 60
+
+# Text-only generators (nothing is executed)
+pufferrelay -f capture.pcap --commands --serveme --dump out
+```
+`--commands` writes `active-commands.md` (ARP spoof / relay commands with
+cleanup); `--serveme` writes `serveme.md` (next-step command per host and
+finding). `--keep-live-capture` keeps the temporary live capture.
+
 ### Documentation
 Documentation lives in <a href="wiki/README.md">wiki/</a> (source for the GitBook: install, features, protocols, outputs, performance, privacy, FAQ).
 

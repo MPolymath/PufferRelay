@@ -37,13 +37,19 @@ status board.
       (counts + sample source/destination IPs) in the quick_wins table and
       surfaced in the lead feed; cleartext protocols with credentials are
       stored as critical.
-- [ ] Tier B (network actions) with warnings: #27, #16, #13, #60.
+- [x] Tier B (network actions) with warnings: #27 live capture, #16 local
+      recording relay, #13 ARP/relay command generator, #60 serve-me
+      suggestions. Every entry prints a red warning and needs explicit
+      authorisation; `--commands`/`--serveme` are text only.
+- [x] #53 cleanup: legacy pyshark handlers and their empty test shells removed;
+      shared logic lives in `protocols/helpers.py`.
 
 ## Known gaps
 
-- Legacy pyshark handlers (`*_handler.py`) are no longer imported; remove them
-  and their tests in a cleanup commit.
 - `local_smoke.py` needs native paths (`C:/...`) when invoked from Git Bash,
   otherwise tshark receives `/c/...` and matches nothing.
 - `-r --protocol` prints raw rows; column-level filters are not implemented yet.
-- No live capture; by design until Tier B with warnings.
+- The proxy relays one target at a time and records JSONL, not pcap; replay the
+  JSONL through your own tooling if you need a capture file.
+- ARP command generation infers the gateway as `.1` of the dominant /24; pass
+  `--gateway` when that assumption is wrong.

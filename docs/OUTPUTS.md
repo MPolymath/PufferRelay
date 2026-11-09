@@ -90,6 +90,29 @@ pufferrelay -r --protocol ftp,ntlm                     # raw rows for those prot
 pufferrelay -r --protocol ftp --json                  # tab-separated (machine mode)
 ```
 
+## Command generators (issues #13, #60)
+
+```bash
+pufferrelay -f capture.pcap --commands --dump out   # writes out/active-commands.md
+pufferrelay -f capture.pcap --serveme  --dump out   # writes out/serveme.md
+pufferrelay -f capture.pcap --commands --serveme --iface ens33 --gateway 10.0.0.1
+```
+
+Both files are **text only**; PufferRelay never executes them. Every command is
+labelled ACTIVE, and `active-commands.md` includes ARP/relay cleanup commands.
+
+## Active modes (Tier B)
+
+```bash
+pufferrelay --live eth0 --bpf "port 445" --duration 120
+pufferrelay --proxy --proxy-target 10.0.0.10:445 --duration 60
+```
+
+Both print a red warning and require `authorized` (interactive) or
+`--confirm-authorized`. Live captures go to a temporary file and are deleted
+after analysis unless `--keep-live-capture` is set.
+
+
 ## Notes
 
 - Nothing in this pack is produced by touching the network.

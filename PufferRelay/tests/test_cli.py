@@ -68,6 +68,34 @@ def test_cli_parse_dump_and_json():
         assert any(lead["severity"] == "high" for lead in payload["leads"])
 
 
+def test_commands_and_serveme_write_text_pack():
+    with tempfile.TemporaryDirectory() as tmp:
+        from scapy.all import Ether, IP, Raw, TCP, wrpcap
+
+        pcap = os.path.join(tmp, "cap.pcap")
+        packets = [
+            Ether() / IP(src="10.0.0.5", dst="10.0.0.10")
+            / TCP(sport=40000, dport=21, flags="PA", seq=1, ack=1)
+            / Raw(load=b"USER alice" + bytes((13, 10))),
+            Ether() / IP(src="10.0.0.5", dst="10.0.0.10")
+            / TCP(sport=40000, dport=21, flags="PA", seq=20, ack=1)
+            / Raw(load=b"PASS s3cret" + bytes((13, 10))),
+        ]
+        wrpcap(pcap, packets)
+
+        result = _run(
+            ["-f", pcap, "--dump", "out", "--commands", "--serveme"],
+            cwd=tmp,
+        )
+        assert result.returncode == 0, result.stderr
+        for name in ("active-commands.md", "serveme.md"):
+            path = os.path.join(tmp, "out", name)
+            assert os.path.exists(path), name
+            with open(path, encoding="utf-8") as handle:
+                text = handle.read()
+            assert "ACTIVE NETWORK TRAFFIC" in text
+
+
 def test_config_file_drives_defaults():
     with tempfile.TemporaryDirectory() as tmp:
         from scapy.all import Ether, IP, Raw, TCP, wrpcap

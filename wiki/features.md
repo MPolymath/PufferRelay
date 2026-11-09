@@ -25,6 +25,17 @@
 `leads.md` (briefing) and `agent-prompt.md` (ready-to-paste instructions).
 See [outputs.md](outputs.md).
 
+## Active modes (opt-in, never default)
+
+| Flag | What it does | Guard rails |
+|---|---|---|
+| `--live IFACE --bpf FILTER` | captures live traffic for `--duration` seconds, then analyses it | red warning, `authorized` confirmation (or `--confirm-authorized`), temp capture deleted unless `--keep-live-capture` |
+| `--proxy --proxy-target HOST:PORT` | local TCP relay, records both directions to JSONL | red warning + confirmation; one target, bounded duration |
+| `--commands` | writes `active-commands.md` (ARP spoof / relay commands) | text only; nothing executed; cleanup commands included |
+| `--serveme` | writes `serveme.md` (next-step command per host/finding) | text only; ACTIVE lines flagged |
+
+Passive analysis remains the default; these modes never run implicitly.
+
 ## Querying
 
 `-r` with `--json`, `--creds`, `--inventory` or `--protocol ftp,ntlm`.

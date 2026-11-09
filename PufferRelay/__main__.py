@@ -45,7 +45,40 @@ from PufferRelay.protocols.quick_wins import analyze_quick_wins
 from PufferRelay.config import ConfigError, configure, get_output_dir, set_db_path
 from PufferRelay.logger import setup_logger
 from PufferRelay.utils.loading_animation import show_loading_animation
-from PufferRelay import export
+from PufferRelay import commands as command_pack
+from PufferRelay import export, live
+from PufferRelay.proxy import ProxyError, run_proxy
+
+
+def _warn_active(machine, title, details):
+    """Conspicuous red warning before anything that sends packets."""
+    lines = list(details) + [
+        "",
+        "[bold]This action sends packets on the network.[/bold]",
+        "Only continue inside an authorised engagement with an agreed scope.",
+        "PufferRelay is passive by default; this mode is opt-in.",
+    ]
+    text = "\n".join(lines)
+    if machine:
+        print(f"WARNING — {title}\n{text}", file=sys.stderr)
+    else:
+        rprint(
+            Panel(
+                text,
+                title=f"[bold red]WARNING — {title}[/bold red]",
+                border_style="red",
+            )
+        )
+
+
+def _refuse_active(machine, what):
+    message = (
+        f"refusing {what}: authorisation not confirmed "
+        "(use --confirm-authorized when you have written scope, "
+        "or run interactively and type 'authorized')"
+    )
+    print(message, file=sys.stderr)
+    sys.exit(2)
 
 
 def read_quick_wins_from_db(conn, show_ready_func=None):
@@ -186,6 +219,81 @@ def main():
         default=None,
         help="Set the logging level (default: config file or INFO)",
     )
+    active = parser.add_argument_group(
+        "active modes (opt-in, send packets, require authorisation)"
+    )
+    active.add_argument(
+        "--live",
+        metavar="IFACE",
+        help="Capture from a network interface, then analyse it like a pcap "
+        "(requires --bpf; the temporary capture is deleted afterwards)",
+    )
+    active.add_argument(
+        "--bpf",
+        metavar="FILTER",
+        help="BPF capture filter (mandatory with --live, e.g. 'port 445')",
+    )
+    active.add_argument(
+        "--duration",
+        type=int,
+        default=60,
+        help="Live capture / relay duration in seconds (default 60)",
+    )
+    active.add_argument(
+        "--confirm-authorized",
+        action="store_true",
+        help="Skip the interactive prompt; use only with written scope",
+    )
+    active.add_argument(
+        "--keep-live-capture",
+        action="store_true",
+        help="Keep the temporary live capture after analysis",
+    )
+    active.add_argument(
+        "--proxy",
+        nargs="?",
+        const="127.0.0.1",
+        metavar="LISTEN_HOST",
+        help="Run a local TCP relay to --proxy-target and record both "
+        "directions to JSONL (default listen host 127.0.0.1)",
+    )
+    active.add_argument(
+        "--proxy-port",
+        type=int,
+        default=0,
+        help="Listen port for --proxy (default: pick a free port)",
+    )
+    active.add_argument(
+        "--proxy-target",
+        metavar="HOST:PORT",
+        help="Target of the --proxy relay (mandatory with --proxy)",
+    )
+    active.add_argument(
+        "--proxy-out",
+        metavar="FILE",
+        help="JSONL recording path for --proxy (default: output_dir/proxy-recording.jsonl)",
+    )
+    parser.add_argument(
+        "--commands",
+        action="store_true",
+        help="Write active-commands.md: ARP spoof / relay commands derived from "
+        "the inventory (text only; nothing is executed)",
+    )
+    parser.add_argument(
+        "--serveme",
+        action="store_true",
+        help="Write serveme.md: next-step commands per host and finding "
+        "(text only; nothing is executed)",
+    )
+    parser.add_argument(
+        "--iface",
+        default="eth0",
+        help="Interface written into generated commands (text only, default eth0)",
+    )
+    parser.add_argument(
+        "--gateway",
+        help="Gateway written into generated ARP commands (default: inferred)",
+    )
     args = parser.parse_args()
 
     try:
@@ -197,6 +305,69 @@ def main():
         sys.exit(2)
 
     setup_logger(getattr(logging, args.log_level or settings["log_level"]))
+
+    machine = bool(args.json or args.creds or args.inventory)
+
+    # ---- active modes: explicit, warned, confirmed, never default -----
+    if args.proxy is not None:
+        if not args.proxy_target:
+            print("error: --proxy requires --proxy-target HOST:PORT", file=sys.stderr)
+            sys.exit(2)
+        _warn_active(
+            machine,
+            "LOCAL TCP RELAY",
+            [
+                f"Listen: {args.proxy}:{args.proxy_port or '<free port>'}",
+                f"Forward to: {args.proxy_target}",
+                f"Duration: {args.duration}s",
+                "Both directions will be recorded to JSONL.",
+            ],
+        )
+        if not live.confirm_authorization(args.confirm_authorized, sys.stdin.isatty()):
+            _refuse_active(machine, "proxy")
+        out_path = args.proxy_out or os.path.join(
+            get_output_dir() or "out", "proxy-recording.jsonl"
+        )
+        out_dir = os.path.dirname(os.path.abspath(out_path))
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
+        try:
+            host, port = run_proxy(
+                args.proxy_target,
+                out_path,
+                listen_port=args.proxy_port,
+                seconds=args.duration,
+                host=args.proxy,
+            )
+        except ProxyError as e:
+            print(f"proxy error: {e}", file=sys.stderr)
+            sys.exit(2)
+        print(f"relay finished: {host}:{port} -> {args.proxy_target}")
+        print(f"recording: {out_path}")
+        return
+
+    live_temp = None
+    if args.live:
+        _warn_active(
+            machine,
+            "LIVE CAPTURE",
+            [
+                f"Interface: {args.live}",
+                f"BPF filter: {args.bpf or '(missing)'}",
+                f"Duration: {args.duration}s",
+            ],
+        )
+        if not args.bpf:
+            print("error: --live requires --bpf (a capture filter)", file=sys.stderr)
+            sys.exit(2)
+        if not live.confirm_authorization(args.confirm_authorized, sys.stdin.isatty()):
+            _refuse_active(machine, "live capture")
+        try:
+            live_temp = live.capture(args.live, args.bpf, args.duration)
+        except live.LiveCaptureError as e:
+            print(f"live capture error: {e}", file=sys.stderr)
+            sys.exit(2)
+        args.file = live_temp
 
     # No capture on the command line: fall back to the configured default.
     if not args.file and not args.quick_wins and not args.read:
@@ -215,7 +386,6 @@ def main():
         return
 
     # Machine modes keep stdout clean: no banner, no spinner, no tables.
-    machine = bool(args.json or args.creds or args.inventory)
     # The loading animation writes cursor/clear escape codes to stdout; do not
     # even initialise it for machine-readable modes.
     if machine:
@@ -315,6 +485,41 @@ def main():
             if args.dump is not None:
                 dump_dir = args.dump or get_output_dir() or "out"
                 run_exports(conn, dump_dir, pcap_name=args.file or args.quick_wins or "")
+
+            if args.commands or args.serveme:
+                include = []
+                if args.commands:
+                    include.append("arp")
+                if args.serveme:
+                    include.append("serve")
+                out_dir = (args.dump if args.dump else "") or get_output_dir() or "out"
+                inventory = export.collect_inventory(conn)
+                written = command_pack.write_command_pack(
+                    inventory,
+                    out_dir,
+                    interface=args.iface,
+                    gateway=args.gateway,
+                    include=tuple(include),
+                )
+                if machine:
+                    for path in written.values():
+                        print(path, file=sys.stderr)
+                else:
+                    rprint(
+                        Panel(
+                            "\n".join(
+                                ["[green]Command pack written (text only):[/green]"]
+                                + [f"  {path}" for path in written.values()]
+                                + [
+                                    "",
+                                    "[bold red]Every line in these files sends "
+                                    "packets when run.[/bold red]",
+                                ]
+                            ),
+                            title="Active commands",
+                            border_style="red",
+                        )
+                    )
         except Exception as e:
             logging.error(f"Error during processing: {str(e)}")
             raise
@@ -326,6 +531,12 @@ def main():
         logging.error(f"Error: {str(e)}")
         sys.exit(1)
     finally:
+        if live_temp and not args.keep_live_capture:
+            try:
+                os.remove(live_temp)
+                logging.info("Removed temporary live capture")
+            except OSError:
+                pass
         if conn:
             try:
                 conn.close()
