@@ -62,6 +62,12 @@ its evidence, suggested next actions, and explicit warnings for anything that
 sends traffic). See [docs/OUTPUTS.md](docs/OUTPUTS.md) and
 [docs/PLAN.md](docs/PLAN.md).
 
+#### Config file (optional)
+pufferrelay --config config.json -f {filename} <br>
+# config.json: db_path, output_dir, default_pcap, log_level
+# `--dump` without a directory uses output_dir; default_pcap is used when
+# -f/-q is omitted.
+
 #### Query the database
 pufferrelay -r --json <br>
 pufferrelay -r --creds <br>

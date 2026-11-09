@@ -24,7 +24,7 @@ from PufferRelay.core_imports import (
     logging,
     time
 )
-from PufferRelay.config import DB_NAME
+from PufferRelay.config import get_db_name
 
 # Current schema version - increment this when making schema changes
 CURRENT_SCHEMA_VERSION = 9
@@ -114,7 +114,7 @@ def get_db_schema_version(conn):
 def check_database_version():
     """Check if the database schema version matches the current version."""
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(get_db_name())
         cursor = conn.cursor()
         
         # Check if version table exists

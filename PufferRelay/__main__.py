@@ -42,6 +42,7 @@ from PufferRelay.database.db_queries import (
     update_quick_win,
 )
 from PufferRelay.protocols.quick_wins import analyze_quick_wins
+from PufferRelay.config import ConfigError, configure, get_output_dir, set_db_path
 from PufferRelay.logger import setup_logger
 from PufferRelay.utils.loading_animation import show_loading_animation
 from PufferRelay import export
@@ -146,9 +147,22 @@ def main():
     )
     parser.add_argument(
         "--dump",
+        nargs="?",
+        const="",
         metavar="DIR",
         help="Write the export pack (inventories, credentials, hashes, nmap "
-        "targets, leads.json, leads.md for AI agents) to DIR",
+        "targets, leads.json, leads.md for AI agents). DIR defaults to the "
+        "configured output_dir (./out).",
+    )
+    parser.add_argument(
+        "--config",
+        metavar="FILE",
+        help="JSON config file (db_path, log_level, output_dir, default_pcap)",
+    )
+    parser.add_argument(
+        "--db",
+        metavar="PATH",
+        help="Database path (overrides the config file)",
     )
     parser.add_argument(
         "--json",
@@ -169,12 +183,32 @@ def main():
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-        default="INFO",
-        help="Set the logging level",
+        default=None,
+        help="Set the logging level (default: config file or INFO)",
     )
     args = parser.parse_args()
 
-    setup_logger(getattr(logging, args.log_level))
+    try:
+        settings = configure(args.config)
+        if args.db:
+            set_db_path(args.db)
+    except ConfigError as e:
+        print(f"config error: {e}", file=sys.stderr)
+        sys.exit(2)
+
+    setup_logger(getattr(logging, args.log_level or settings["log_level"]))
+
+    # No capture on the command line: fall back to the configured default.
+    if not args.file and not args.quick_wins and not args.read:
+        default_pcap = settings.get("default_pcap") or ""
+        if default_pcap:
+            if not os.path.exists(default_pcap):
+                print(
+                    f"config error: default_pcap not found: {default_pcap}",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+            args.file = default_pcap
 
     if not any([args.file, args.read, args.quick_wins]):
         parser.print_help()
@@ -278,8 +312,9 @@ def main():
                 leads = export.build_leads(inventory)
                 _print_machine_output(args, inventory, leads)
 
-            if args.dump:
-                run_exports(conn, args.dump, pcap_name=args.file or args.quick_wins or "")
+            if args.dump is not None:
+                dump_dir = args.dump or get_output_dir() or "out"
+                run_exports(conn, dump_dir, pcap_name=args.file or args.quick_wins or "")
         except Exception as e:
             logging.error(f"Error during processing: {str(e)}")
             raise

@@ -20,14 +20,14 @@
 
 from PufferRelay.core_imports import sqlite3
 from PufferRelay.core_imports import logging
-from PufferRelay.config import DB_NAME
+from PufferRelay.config import get_db_name
 from .db_version import migrate_database, set_db_schema_version
 
 def create_database(db_path=None):
     """Creates (or migrates) the SQLite database with all protocol tables."""
     conn = None
     try:
-        conn = sqlite3.connect(db_path or DB_NAME)
+        conn = sqlite3.connect(db_path or get_db_name())
         if not migrate_database(conn):
             conn.close()
             return None

@@ -91,7 +91,7 @@ def show_loading_animation():
         sys.stdout.write("\033[?25h")  # Show cursor
         sys.stdout.flush()
     
-    def update_animation(quick_wins=False):
+    def update_animation(quick_wins=False, status=None):
         """Update the animation frame."""
         nonlocal position, direction, dots
         
@@ -116,7 +116,8 @@ def show_loading_animation():
             # Print fish animation in purple
             print("\033[35m" + f"{' ' * position}{fish_frames[int(time.time() * 2) % 2]}" + "\033[0m")
         
-        print(f"{loading_text}{dots}")
+        suffix = f"  {status}" if status else ""
+        print(f"{loading_text}{dots}{suffix}")
         print("=" * width)
         
         sys.stdout.flush()

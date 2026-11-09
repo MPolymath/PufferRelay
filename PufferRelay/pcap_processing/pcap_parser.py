@@ -40,6 +40,8 @@ from PufferRelay.protocols import (
 )
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
+from PufferRelay.utils.progress import ProgressTracker
+import os
 import threading
 import time
 
@@ -106,6 +108,13 @@ def parse_pcap(pcap_file, only=None, credentials_only=False, animate=None):
     logging.info("Parsing PCAP file: %s", pcap_file)
     names = selected_handlers(only=only, credentials_only=credentials_only)
     logging.info("Handlers: %s", ", ".join(names))
+    try:
+        size_mb = os.path.getsize(pcap_file) / (1024 * 1024)
+        logging.info("Capture size: %.1f MiB, %d handler pass(es)", size_mb, len(names))
+    except OSError:
+        pass
+    tracker = ProgressTracker(len(names))
+    tracker.start()
 
     animation_running = False
     animation_thread = None
@@ -118,7 +127,7 @@ def parse_pcap(pcap_file, only=None, credentials_only=False, animate=None):
         def animation_loop():
             """Run the animation until stopped."""
             while animation_running:
-                update_animation()
+                update_animation(quick_wins=False, status=tracker.status_line())
                 time.sleep(0.1)
 
         animation_thread = threading.Thread(target=animation_loop)
@@ -130,6 +139,8 @@ def parse_pcap(pcap_file, only=None, credentials_only=False, animate=None):
         data = {}
         for name in names:
             data[name] = HANDLERS[name](pcap_file)
+            tracker.step(name)
+            logging.info("%s", tracker.status_line())
         return data
     except Exception as e:
         logging.error("Error during PCAP parsing: %s", str(e))

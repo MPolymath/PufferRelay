@@ -22,7 +22,7 @@ from PufferRelay.core_imports import sqlite3
 from PufferRelay.core_imports import os
 from PufferRelay.core_imports import logging
 from PufferRelay.core_imports import sys
-from PufferRelay.config import DB_NAME
+from PufferRelay.config import get_db_name
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -35,17 +35,17 @@ def get_db_connection():
         sqlite3.Connection: A connection object to the SQLite database.
     """
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(get_db_name())
         conn.row_factory = sqlite3.Row  # Allows dictionary-like row access
-        logging.info(f"Connected to SQLite database: {DB_NAME}")
+        logging.info(f"Connected to SQLite database: {get_db_name()}")
         return conn
     except sqlite3.Error as e:
         logging.error(f"Database connection error: {e}")
-        logging.error(f"Database path: {DB_NAME}")
+        logging.error(f"Database path: {get_db_name()}")
         return None
     except Exception as e:
         logging.error(f"Unexpected error while connecting to database: {e}")
-        logging.error(f"Database path: {DB_NAME}")
+        logging.error(f"Database path: {get_db_name()}")
         return None
 
 def close_connection(conn):

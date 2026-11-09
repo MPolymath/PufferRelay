@@ -16,6 +16,9 @@ Synthetic 20,000-packet capture, same machine:
 Small provided captures: full parse 4.1–5.1 s (most of that is tshark startup
 per handler).
 
+The loading screen shows `handler 3/14 ftp | elapsed 00:12 | ETA 00:41`; the
+same line is logged at INFO so long runs are predictable.
+
 ## Big captures
 
 - Use `--only` for the protocols you care about; each handler is one pass.

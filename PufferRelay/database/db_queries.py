@@ -29,7 +29,7 @@ from PufferRelay.core_imports import (
 from rich.table import Table
 from rich.console import Console
 from rich.text import Text
-from PufferRelay.config import DB_NAME
+from PufferRelay.config import get_db_name
 
 def get_terminal_width():
     """Get the current terminal width, with a fallback to 80 characters."""
@@ -45,7 +45,7 @@ def insert_into_database(protocol, data, db_path=None):
 
     conn = None
     try:
-        conn = sqlite3.connect(db_path or DB_NAME)
+        conn = sqlite3.connect(db_path or get_db_name())
         cursor = conn.cursor()
         
         # Insert only if the combination does not already exist
