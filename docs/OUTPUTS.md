@@ -85,6 +85,9 @@ Rules an agent must follow when consuming it:
 | `kerberos-signals.tsv` | S4U/delegation/UnPAC signals | AD delegation review |
 | `ldap-spns.tsv` | account, SPN, objectSID | Kerberoast targeting, BloodHound SIDs |
 | `ldap-signing.tsv` | destination, bind counts, simple/SASL | LDAP relay candidate |
+| `ldap-adcs.tsv` | CA/template objects and SAN flag | ADCS escalation review |
+| `credential-matrix.tsv`, `identity-graph.json` | identity reuse matrix, normalized graph | path planning |
+| `fingerprints.tsv` | SSH/TLS/VNC/TFTP details | service triage |
 | `voip.tsv` | SIP/Skinny call metadata | voice exposure |
 | `media.tsv` | audio/video objects already carved | media triage |
 | `rdp.tsv`, `cloud-apis.tsv` | RDP identity/negotiation; exposed Docker/K8s/Vault/... APIs | remote access and control planes |
@@ -111,7 +114,11 @@ pufferrelay -r --user alice --has-creds                # that identity's secrets
 pufferrelay -r --table dns_events --limit 100          # raw table dump
 pufferrelay -f capture.pcap --report out/report.html  # HTML or .md
 pufferrelay -f capture.pcap --auto --dump out         # profile the services
+pufferrelay -f capture.pcap --auto --jobs 4 --dump out
+pufferrelay -f big.pcap --chunk-packets 200000 --dump out
 pufferrelay -r --diff old.db                          # diff.md
+pufferrelay -r --detections                           # catalog
+pufferrelay --version
 pufferrelay -r --triage                               # loopback Ollama only
 pufferrelay -r --protocol ftp --json                  # tab-separated (machine mode)
 ```

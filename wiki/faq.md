@@ -111,6 +111,16 @@ In `active-commands.md` (written by `--commands`) when the capture contains
 EAP/RADIUS/MAB observations; they are text only, with cleanup, and the section
 is omitted when there is no NAC data.
 
+**How do I handle a very large capture?**
+`--auto` first (only relevant handlers). If it is still too slow or the run may
+be interrupted, `--chunk-packets 200000` splits with editcap, stores each chunk
+and resumes from a checkpoint. `--jobs 4` runs independent handler passes in
+parallel (memory scales with the job count).
+
+**What is `--detections`?**
+It prints the generated detection catalog (handler, class, mode, severity,
+status) so you can see what is wired without opening the wiki.
+
 **Where is the database?**
 By default `extracted_data.db` in the working directory. Use `--db PATH` or
 `db_path` in the config file to keep it with the engagement; delete it with the

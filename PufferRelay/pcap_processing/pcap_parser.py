@@ -53,6 +53,8 @@ from PufferRelay.protocols import (
     process_voip,
     process_rdp,
     process_cloudapi,
+    process_fingerprints,
+    process_ldap_adcs,
 )
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
@@ -95,6 +97,8 @@ HANDLERS = {
     "voip": process_voip,
     "rdp": process_rdp,
     "cloudapi": process_cloudapi,
+    "fingerprints": process_fingerprints,
+    "ldapadcs": process_ldap_adcs,
     "services": process_services,
     "ips": process_ips,
 }
@@ -103,7 +107,7 @@ HANDLERS = {
 CREDENTIAL_HANDLERS = {"ldap", "http", "ftp", "telnet", "smtp", "imap", "pop3", "ntlm",
                        "kerberos", "relays", "smb", "files", "nac", "httptokens",
                        "dbcreds", "kerberoast", "asrepcatcher", "smbobjects",
-                       "kerberosdepth", "ldapdir", "rdp"}
+                       "kerberosdepth", "ldapdir", "rdp", "ldapadcs"}
 
 
 def selected_handlers(only=None, credentials_only=False):
@@ -127,7 +131,7 @@ def selected_handlers(only=None, credentials_only=False):
     return names
 
 
-def parse_pcap(pcap_file, only=None, credentials_only=False, animate=None):
+def parse_pcap(pcap_file, only=None, credentials_only=False, animate=None, jobs=1):
     """Parses a PCAP file and extracts data for the selected protocol handlers.
 
     Args:
@@ -171,11 +175,32 @@ def parse_pcap(pcap_file, only=None, credentials_only=False, animate=None):
 
     try:
         data = {}
-        for name in names:
-            data[name] = HANDLERS[name](pcap_file)
-            tracker.step(name)
-            logging.info("%s", tracker.status_line())
-        return data
+        workers = max(1, int(jobs or 1))
+        if workers == 1 or len(names) < 2:
+            for name in names:
+                data[name] = HANDLERS[name](pcap_file)
+                tracker.step(name)
+                logging.info("%s", tracker.status_line())
+            return data
+
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        step_lock = threading.Lock()
+
+        def run(name):
+            result = HANDLERS[name](pcap_file)
+            with step_lock:
+                tracker.step(name)
+                logging.info("%s", tracker.status_line())
+            return name, result
+
+        with ThreadPoolExecutor(max_workers=min(workers, len(names))) as pool:
+            futures = {pool.submit(run, name): name for name in names}
+            for future in as_completed(futures):
+                name, result = future.result()
+                data[name] = result
+        # Keep the registry order so exports and tests stay deterministic.
+        return {name: data[name] for name in names}
     except Exception as e:
         logging.error("Error during PCAP parsing: %s", str(e))
         raise

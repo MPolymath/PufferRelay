@@ -54,6 +54,8 @@ from .ldapdir import process_ldap_directory
 from .voip import process_voip
 from .rdp import process_rdp
 from .cloudapi import process_cloudapi
+from .fingerprints import process_fingerprints
+from .ldapadcs import process_ldap_adcs
 
 __all__ = [
     'process_ldap',
@@ -89,5 +91,7 @@ __all__ = [
     'process_ldap_directory',
     'process_voip',
     'process_rdp',
-    'process_cloudapi'
+    'process_cloudapi',
+    'process_fingerprints',
+    'process_ldap_adcs'
 ]

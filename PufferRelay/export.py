@@ -24,6 +24,43 @@ from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from PufferRelay.protocols.helpers import interesting_file
 from PufferRelay.protocols.asrepcatcher import REFERENCE as ASREPCATCHER_REFERENCE
+from PufferRelay.graph import build_graph
+
+ATTCK_BY_PREFIX = {
+    "CRED": ["T1078", "T1552.001"],
+    "HASH": ["T1110.002"],
+    "ASREP": ["T1558.004"],
+    "KERBEROAST": ["T1558.003"],
+    "KERBEROASTCAND": ["T1558.003"],
+    "TOKEN": ["T1528", "T1552.001"],
+    "RELAY": ["T1557.001"],
+    "COERCE": ["T1187"],
+    "ADCS": ["T1649"],
+    "SCCM": ["T1078"],
+    "IPV6": ["T1557"],
+    "DB": ["T1078", "T1552.001"],
+    "LLM": ["T1528"],
+    "KERB": ["T1558"],
+    "SPN": ["T1558.003"],
+    "LDAPSIGN": ["T1557.001"],
+    "CHAIN": ["T1557"],
+    "VOIP": ["T1123"],
+    "RDP": ["T1021.001"],
+    "CLOUD": ["T1078.004"],
+    "WPAD": ["T1557"],
+    "SMB": ["T1021.002"],
+    "SMBFILE": ["T1039"],
+    "FILE": ["T1039"],
+    "NAC": ["T1557"],
+    "WSUS": ["T1072"],
+    "ASREPCATCHER": ["T1557", "T1558.004"],
+    "QW": ["T1040"],
+    "REUSE": ["T1078"],
+}
+
+
+def attck_for(lead_id: str) -> List[str]:
+    return ATTCK_BY_PREFIX.get((lead_id or "").split("-", 1)[0].upper(), [])
 
 EXPORT_SCHEMA = 1
 
@@ -1086,6 +1123,35 @@ def build_chains(inventory: Dict) -> List[Dict]:
     return chains
 
 
+def collect_ldap_adcs(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "ldap_adcs"):
+        return out
+    for kind, severity, name, dns_name, template, detail, evidence, src, dst in _rows(
+        conn,
+        "SELECT kind, severity, name, dns_name, template, detail, evidence, "
+        "src_ip, dst_ip FROM ldap_adcs",
+    ):
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "medium",
+                "name": name or "",
+                "dns_name": dns_name or "",
+                "template": template or "",
+                "detail": detail or "",
+                "evidence": parsed,
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+            }
+        )
+    return out
+
+
 def collect_voip(conn: sqlite3.Connection) -> List[Dict]:
     out = []
     if not _has_table(conn, "voip_calls"):
@@ -1141,10 +1207,13 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "ldap_spns": collect_ldap_spns(conn),
         "ldap_signing": collect_ldap_signing(conn),
         "voip": collect_voip(conn),
+        "ldap_adcs": collect_ldap_adcs(conn),
         "rdp": collect_service_events(conn, "rdp"),
         "cloudapi": collect_service_events(conn, "cloudapi"),
+        "fingerprints": collect_service_events(conn, "fingerprints"),
     }
     inventory["chains"] = build_chains(inventory)
+    inventory["graph"] = build_graph(inventory)
     return inventory
 
 
@@ -1224,6 +1293,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
         lead.setdefault("suggested_actions", [])
         lead.setdefault("passive", True)
         lead.setdefault("confidence", "high")
+        lead.setdefault("attck", attck_for(lead.get("id", "")))
         leads.append(lead)
 
     # 1. Quick wins that are directly exploitable.
@@ -1830,6 +1900,67 @@ def build_leads(inventory: Dict) -> List[Dict]:
                         "intent": "Check whether the WPAD answer came from a "
                         "legitimate proxy",
                         "command": "inspect dns.txt and the proxy configuration",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3s. Identity reuse graph.
+    for i, row in enumerate(inventory.get("graph", {}).get("reuse", []), start=1):
+        add(
+            {
+                "id": f"REUSE-{i:03d}",
+                "severity": row["severity"],
+                "title": f"{row['identity']}: {row['kind']}",
+                "why": row["detail"]
+                + " Reuse across hosts is what turns one credential into a path.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the identity's hosts and credential sources",
+                        "command": "open credential-matrix.tsv and identity-graph.json",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3t. Service fingerprints (SSH/TLS/VNC/TFTP).
+    for i, row in enumerate(inventory.get("fingerprints", []), start=1):
+        add(
+            {
+                "id": f"FP-{i:03d}",
+                "severity": row["severity"],
+                "title": f"{row['kind']}: {row['destination_ip']}",
+                "why": row["detail"]
+                + " Service banners and encryption choices narrow the next test.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the service version/encryption",
+                        "command": "inspect fingerprints.tsv and the host's services",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3u. ADCS CA/template objects published in LDAP.
+    for i, row in enumerate(inventory.get("ldap_adcs", []), start=1):
+        add(
+            {
+                "id": f"ADCSDIR-{i:03d}",
+                "severity": row["severity"],
+                "title": f"ADCS {row['kind']}: {row['name']}",
+                "why": row["detail"]
+                + " The CA/template configuration tells you which enrollment "
+                "paths exist; verify the effective rights before testing.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the CA and template in the directory",
+                        "command": "inspect ldap-adcs.tsv and the CA host",
                         "active": False,
                     }
                 ],
@@ -2541,6 +2672,16 @@ def write_exports(
         ],
     )
     _write_text(
+        path("ldap-adcs.tsv"),
+        ["kind	severity	name	dns_name	template	detail	src	dst"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['name'] or '-'}	"
+            f"{row['dns_name'] or '-'}	{row['template'] or '-'}	{row['detail']}	"
+            f"{row['source_ip'] or '-'}	{row['destination_ip'] or '-'}"
+            for row in inventory.get("ldap_adcs", [])
+        ],
+    )
+    _write_text(
         path("voip.tsv"),
         ["kind	severity	src	dst	caller	callee	call_id	detail"]
         + [
@@ -2570,6 +2711,16 @@ def write_exports(
             for row in inventory.get("cloudapi", [])
         ],
     )
+    _write_text(
+        path("fingerprints.tsv"),
+        ["kind	severity	src	dst	principal	detail"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['principal'] or '-'}	"
+            f"{row['detail']}"
+            for row in inventory.get("fingerprints", [])
+        ],
+    )
     media = [
         row
         for row in inventory.get("files", [])
@@ -2584,6 +2735,28 @@ def write_exports(
             f"{row['destination_ip'] or '-'}	{row['filename']}"
             for row in media
         ],
+    )
+    graph = inventory.get("graph") or {}
+    _write_text(
+        path("credential-matrix.tsv"),
+        ["identity	sid	sources	cleartext	hashes	destinations	credentials"]
+        + [
+            f"{row['identity']}	{row['sid'] or '-'}	"
+            f"{','.join(row['sources']) or '-'}	"
+            f"{','.join(row['cleartext_protocols']) or '-'}	"
+            f"{','.join(row['hash_kinds']) or '-'}	"
+            f"{','.join(row['destinations']) or '-'}	{row['credential_count']}"
+            for row in graph.get("matrix", [])
+        ],
+    )
+    _write_json(
+        path("identity-graph.json"),
+        {
+            "nodes": graph.get("nodes", {}),
+            "edges": graph.get("edges", []),
+            "matrix": graph.get("matrix", []),
+            "reuse": graph.get("reuse", []),
+        },
     )
 
     # Carved file objects (issue #57). These are client data: they stay in the

@@ -10,6 +10,7 @@ columns it needs.
 from __future__ import annotations
 
 import os
+import threading
 
 from PufferRelay.tshark_fields import fields
 
@@ -33,6 +34,7 @@ FIELDS = [
 ]
 
 _CACHE = {}
+_LOCK = threading.Lock()
 
 
 def _key(pcap_file):
@@ -46,11 +48,12 @@ def _key(pcap_file):
 def rows(pcap_file):
     """Cached rows for the union pass (16 columns, see FIELDS)."""
     key = _key(pcap_file)
-    if key is not None and key in _CACHE:
-        return _CACHE[key]
-    data = fields(pcap_file, "kerberos || arp", FIELDS, occurrence="a")
-    if key is not None:
-        if len(_CACHE) > 8:
-            _CACHE.clear()
-        _CACHE[key] = data
-    return data
+    with _LOCK:
+        if key is not None and key in _CACHE:
+            return _CACHE[key]
+        data = fields(pcap_file, "kerberos || arp", FIELDS, occurrence="a")
+        if key is not None:
+            if len(_CACHE) > 8:
+                _CACHE.clear()
+            _CACHE[key] = data
+        return data

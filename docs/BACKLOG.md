@@ -80,6 +80,18 @@ Issue bodies: `../attack-library/pufferrelay-issues/` (filed as #64-#71).
 - [x] Report HTML, `--diff` two-database delta, cleanup checklist.
 - [x] RDP identity/negotiation, Docker/K8s/etcd/Consul/Vault/Veeam exposure,
       WPAD lookups, and the NAC spoof proposals (#30) in `active-commands.md`.
+- [x] LDAP ADCS: CA host/published templates and the ESC1 SAN flag
+      (`ldap-adcs.tsv`, `ADCSDIR-*`).
+- [x] Identity graph + credential reuse matrix (`identity-graph.json`,
+      `credential-matrix.tsv`, `REUSE-*`) and ATT&CK IDs on every lead.
+- [x] Scale: `--jobs N` parallel passes; `--chunk-packets N` editcap chunks with
+      resume checkpoint.
+- [x] Fingerprints: SSH banners, TLS SNI/version, VNC security type, TFTP files
+      (`fingerprints.tsv`, `FP-*`).
+- [x] Detection scaffold (`scripts/new_detection.py`), plugin contract
+      (`docs/PLUGINS.md`), `--detections`, public-capture validation harness.
+- [x] Release engineering: version 1.1.0, CHANGELOG, Dockerfile, coverage in CI,
+      GitHub release tag.
 - [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM

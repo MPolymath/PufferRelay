@@ -31,7 +31,9 @@ def _table(lines: List[str], headers: List[str], rows: List[List[str]]) -> None:
     lines.append("")
 
 
-def render_report(inventory: Dict, leads: List[Dict], pcap_name: str = "") -> str:
+def render_report(inventory: Dict, leads: List[Dict], pcap_name: str = "",
+                  meta: Dict | None = None) -> str:
+    meta = meta or {}
     generated = time.strftime("%Y-%m-%d %H:%M:%S")
     counts = _counts(leads)
     hosts = inventory.get("hosts", [])
@@ -40,18 +42,23 @@ def render_report(inventory: Dict, leads: List[Dict], pcap_name: str = "") -> st
     files = inventory.get("files", [])
 
     lines: List[str] = [
-        "# Capture analysis report",
+        f"# {meta.get('title') or 'Capture analysis report'}",
         "",
         f"- capture: `{pcap_name or '(database only)'}`",
         f"- generated: {generated}",
         "- method: passive pcap analysis (PufferRelay). No traffic was sent.",
-        "",
-        "> This report is client-confidential. It contains real credentials, "
-        "hosts and hashes; keep it on the engagement machine.",
-        "",
-        "## Executive summary",
-        "",
     ]
+    for key, label in (("client", "client"), ("assessor", "assessor"), ("scope", "scope")):
+        if meta.get(key):
+            lines.append(f"- {label}: {meta[key]}")
+    lines.append("")
+    lines.append(
+        "> This report is client-confidential. It contains real credentials, "
+        "hosts and hashes; keep it on the engagement machine."
+    )
+    lines.append("")
+    lines.append("## Executive summary")
+    lines.append("")
     _table(
         lines,
         ["Severity", "Leads"],
@@ -82,6 +89,8 @@ def render_report(inventory: Dict, leads: List[Dict], pcap_name: str = "") -> st
         )
         lines.append("")
         lines.append(f"- **Confidence:** {lead.get('confidence', 'high')}")
+        if lead.get("attck"):
+            lines.append(f"- **ATT&CK:** {', '.join(lead['attck'])}")
         lines.append(f"- **Why it matters:** {lead.get('why', '')}")
         evidence = lead.get("evidence") or {}
         if evidence:
@@ -191,10 +200,12 @@ def render_report(inventory: Dict, leads: List[Dict], pcap_name: str = "") -> st
     return "\n".join(lines)
 
 
-def render_html(inventory: Dict, leads: List[Dict], pcap_name: str = "") -> str:
+def render_html(inventory: Dict, leads: List[Dict], pcap_name: str = "",
+                meta: Dict | None = None) -> str:
     """Same report as render_report, as a standalone HTML page."""
     import html
 
+    meta = meta or {}
     counts = _counts(leads)
     ranked = sorted(leads, key=lambda lead: SEVERITY_ORDER.get(lead.get("severity"), 9))
 
@@ -217,11 +228,18 @@ def render_html(inventory: Dict, leads: List[Dict], pcap_name: str = "") -> str:
         f"<p><strong>Capture:</strong> <code>{esc(pcap_name or '(database only)')}</code><br>",
         f"<strong>Generated:</strong> {esc(time.strftime('%Y-%m-%d %H:%M:%S'))}<br>",
         "<strong>Method:</strong> passive pcap analysis. No traffic was sent.</p>",
+    ]
+    for key, label in (("client", "Client"), ("assessor", "Assessor"), ("scope", "Scope")):
+        if meta.get(key):
+            parts.append(f"<p><strong>{label}:</strong> {esc(meta[key])}</p>")
+    parts.append(
         "<p><strong>Client-confidential.</strong> This report contains real "
-        "credentials, hosts and hashes; keep it on the engagement machine.</p>",
+        "credentials, hosts and hashes; keep it on the engagement machine.</p>"
+    )
+    parts.extend([
         "<h2>Executive summary</h2>",
         "<table><tr><th>Severity</th><th>Leads</th></tr>",
-    ]
+    ])
     for severity in ("critical", "high", "medium", "low"):
         parts.append(
             f"<tr><td class='{severity}'>{severity.capitalize()}</td>"
@@ -245,7 +263,12 @@ def render_html(inventory: Dict, leads: List[Dict], pcap_name: str = "") -> str:
         )
         parts.append(
             f"<p><strong>Confidence:</strong> {esc(lead.get('confidence', 'high'))}<br>"
-            f"<strong>Why:</strong> {esc(lead.get('why', ''))}</p>"
+            + (
+                f"<strong>ATT&amp;CK:</strong> {esc(', '.join(lead['attck']))}<br>"
+                if lead.get("attck")
+                else ""
+            )
+            + f"<strong>Why:</strong> {esc(lead.get('why', ''))}</p>"
         )
         evidence = lead.get("evidence") or {}
         if evidence:
@@ -317,15 +340,15 @@ def render_html(inventory: Dict, leads: List[Dict], pcap_name: str = "") -> str:
     return "\n".join(parts)
 
 
-def write_report(conn, out_path: str, pcap_name: str = "") -> str:
+def write_report(conn, out_path: str, pcap_name: str = "", meta: Dict | None = None) -> str:
     from PufferRelay.export import build_leads, collect_inventory
 
     inventory = collect_inventory(conn)
     leads = build_leads(inventory)
     if out_path.lower().endswith((".html", ".htm")):
-        text = render_html(inventory, leads, pcap_name)
+        text = render_html(inventory, leads, pcap_name, meta)
     else:
-        text = render_report(inventory, leads, pcap_name)
+        text = render_report(inventory, leads, pcap_name, meta)
     directory = os.path.dirname(os.path.abspath(out_path))
     if directory:
         os.makedirs(directory, exist_ok=True)

@@ -1,0 +1,13 @@
+.git
+.github
+__pycache__
+*.py[cod]
+*.pcap
+*.pcapng
+*.cap
+*.db
+out/
+logs/
+venv/
+.venv/
+tests/

@@ -59,8 +59,9 @@ The pack contains `ips.txt`, `subnets.txt`, `users.txt`, `hosts.tsv`,
 `nmap-targets.txt`, `nmap-command.txt`, `credentials.csv`, `ntlm-hashes.txt`,
 `kerberoast-hashes.txt`, `dns.txt`, `asrepcatcher.txt`, `tokens.tsv`,
 `coercions.tsv`, `adcs.tsv`, `ipv6.tsv`, `db-creds.tsv`, `sccm.tsv`, `llm.tsv`,
-`kerberos-signals.tsv`, `ldap-spns.tsv`, `ldap-signing.tsv`, `voip.tsv`,
-`media.tsv`, `summary.json`, and the agent feed: `leads.json` + `leads.md` (every lead with
+`kerberos-signals.tsv`, `ldap-spns.tsv`, `ldap-signing.tsv`, `ldap-adcs.tsv`,
+`voip.tsv`, `media.tsv`, `rdp.tsv`, `cloud-apis.tsv`, `fingerprints.tsv`,
+`credential-matrix.tsv`, `identity-graph.json`, `summary.json`, and the agent feed: `leads.json` + `leads.md` (every lead with
 its evidence, suggested next actions, and explicit warnings for anything that
 sends traffic). See [docs/OUTPUTS.md](docs/OUTPUTS.md) and
 [docs/PLAN.md](docs/PLAN.md).
@@ -71,13 +72,16 @@ pufferrelay --config config.json -f {filename} <br>
 # `--dump` without a directory uses output_dir; default_pcap is used when
 # -f/-q is omitted.
 
-#### Auto profile, report and diff
+#### Auto profile, scale, report and diff
 ```bash
 pufferrelay -f capture.pcapng --auto --dump out       # only relevant handlers
+pufferrelay -f capture.pcapng --auto --jobs 4         # parallel passes
+pufferrelay -f big.pcapng --chunk-packets 200000      # chunked, resumable
 pufferrelay -f capture.pcapng --report out/report.html # Markdown or HTML
 pufferrelay -r --diff old.db                          # new hosts/users/leads
 pufferrelay -f capture.pcapng --report out/report.md   # confidential deliverable
 pufferrelay -r --triage --triage-model llama3          # loopback Ollama only
+pufferrelay --detections                               # detection catalog
 ```
 `--triage` refuses non-loopback URLs and sends only lead metadata, never
 credentials, hashes, commands or packet data.

@@ -54,13 +54,17 @@ jobs:
       - name: install python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt pytest scapy
+          pip install -r requirements.txt pytest scapy pytest-cov
 
       - name: byte-compile
         run: python -m compileall -q PufferRelay
 
       - name: tests
         run: python -m pytest PufferRelay/tests -q
+
+      - name: coverage report
+        if: matrix.wiki
+        run: python -m pytest PufferRelay/tests -q --cov=PufferRelay --cov-report=term
 
       - name: wiki catalog is current
         if: matrix.wiki

@@ -68,6 +68,7 @@ PufferRelay/
   core_imports.py        single import surface (pyshark, rich, sqlite3, ...)
   pcap_processing/
     pcap_parser.py       handler registry + --only/--credentials-only filters
+    chunker.py           editcap chunks + resume checkpoint for huge captures
   tshark_fields.py       one-pass `tshark -T fields` extraction (fast path)
   live.py                #27 live capture (opt-in, warned in __main__)
   proxy.py               #16 local TCP relay + JSONL recording (opt-in)
@@ -97,10 +98,14 @@ PufferRelay/
     kerberos_shared.py   one cached Kerberos/ARP pass for four handlers
     kerberos_depth.py    S4U, delegation flags, UnPAC chains
     ldapdir.py           SPN -> account and objectSID from LDAP results
+    ldapadcs.py          ADCS CA/template objects from LDAP
+    fingerprints.py      SSH/TLS/VNC/TFTP service fingerprints
     voip.py              SIP and Skinny/SCCP call metadata
     rdp.py               RDP negotiation and visible client identity
     cloudapi.py          Docker/K8s/etcd/Consul/Vault/Veeam exposure
   profile.py             --auto: handlers selected from observed services
+  graph.py               identity/credential normalization and reuse
+  catalog.py             read wiki/detections.yaml for --detections
     quick_wins.py        regex sweep over every packet for "quick win" flags
   database/
     db_models.py         CREATE TABLE IF NOT EXISTS + quick_wins seed
@@ -109,7 +114,7 @@ PufferRelay/
   utils/
     display.py           Rich tables/panels
     loading_animation.py spinner + READY banner
-  tests/                 pytest suite (134 tests: pure, DB, e2e pcap, CLI, relay)
+  tests/                 pytest suite (149 tests: pure, DB, e2e pcap, CLI, ops)
 ```
 
 Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->
@@ -174,15 +179,17 @@ Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->
 - A default full run starts 36 tshark passes for 34 handlers; `--auto` selects
   from the observed services (10 handlers on the mixed benchmark),
   `--only`/`--credentials-only` remain the manual levers.
-- ADCS template/CA names are not extracted from LDAP; SCCM SMS Provider DCOM
-  is not parsed. Their catalog entries stay `partial`. Encrypted SMB3 objects
-  cannot be carved.
-- LDAP attribute/value pairing is positional; objectSID and SPN mapping can be
+- ADCS template/CA objects are extracted from LDAP; template ACLs and effective
+  rights are not visible. SCCM SMS Provider DCOM (WMI) is not distinguishable
+  passively. Encrypted SMB3 objects cannot be carved.
+- LDAP attribute/value pairing is positional; objectSID/SPN/CA mapping can be
   confused by commas or split searchResultEntry packets.
 - MySQL/PostgreSQL hash formats assume the salt and response are both visible;
   SCRAM is reported as a mechanism only.
-- `--triage` requires a local Ollama model and is loopback-only by design;
-  `report.md`/`report.html` and `diff.md` contain real secrets.
+- Parallel `--jobs` multiplies tshark memory; chunking uses editcap and leaves
+  processed chunks deleted, resuming from a temp checkpoint.
+- `--triage` requires a local Ollama model and is loopback-only; reports,
+  diffs, the graph and the matrix contain real secrets.
 - Media is carved when it travels over HTTP/FTP/SMB; RTP/SRTP is not decoded.
   SIP/Skinny signalling is decoded, not the calls themselves.
 - CI matrix covers Linux (3.11/3.13), Windows and macOS with the OS tshark;

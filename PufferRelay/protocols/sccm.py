@@ -15,6 +15,7 @@ from PufferRelay.tshark_fields import fields
 HTTP_FILTER = (
     'http.request && (http.request.uri contains "/SMS_MP" '
     '|| http.request.uri contains "ccmhttp" '
+    '|| http.request.uri contains "/AdminService" '
     '|| http.request.uri contains "Content_" '
     '|| http.request.uri contains "SMSPKG" '
     '|| http.request.uri contains "/CCM_System" '
@@ -44,6 +45,8 @@ def _http_pass(pcap_file):
         uri_text = uri or ""
         if any(marker in uri_text for marker in ("/SMS_MP", "ccmhttp", "/CCM_System")):
             kind = "sccm-mp-http"
+        elif "/AdminService" in uri_text:
+            kind = "sccm-adminservice"
         elif any(marker in uri_text for marker in ("Content_", "SMSPKG", ".pkg")):
             kind = "sccm-dp-http"
         else:

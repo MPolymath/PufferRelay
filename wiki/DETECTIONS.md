@@ -5,7 +5,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 > Detection is not exploitation. A passive finding says what crossed the wire; verify before acting, and respect the scope.
 
-39 entries: 35 passive, 4 active.
+41 entries: 37 passive, 4 active.
 
 ## Inventory (3)
 
@@ -215,7 +215,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Capture fields:** kerberos.padata_type, kerberos.additional_tickets, kerberos.TicketFlags.*  
 **Reference:** https://www.thehacker.recipes/ad/movement/kerberos/delegations/
 
-## Ad (7)
+## Ad (8)
 
 | When | Handler | Detects | Severity | Status |
 |---|---|---|---|---|
@@ -226,6 +226,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 | HTTP /certsrv enrollment, Kerberos PKINIT or MS-WCCE DCOM enrollment is present | `adcs` | HTTP enrollment (NTLM flagged high), PKINIT AS-REQ, and DCOM binds to ICertRequestD/D2/ICertAdminD2 | high | partial |
 | SCCM management/distribution HTTP, SMS shares or site-server admin-share traffic is present | `sccm` | management point, distribution point, site/package shares, and client-push SMB from an observed MP to ADMIN$/C$ | high | partial |
 | LDAP search results contain sAMAccountName, objectSID or servicePrincipalName | `ldapdir` | SPN-to-account mapping and objectSID when the directory response is captured | medium | partial |
+| LDAP search results contain pKIEnrollmentService or pKICertificateTemplate objects | `ldapadcs` | CA name/DNS host/published templates, and template SAN/enrollment flags | high | partial |
 
 ### `relays` — det.relays
 
@@ -297,7 +298,17 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Capture fields:** ldap.AttributeDescription, ldap.AttributeValue  
 **Reference:** https://www.thehacker.recipes/ad/recon/ldap
 
-## Network (5)
+### `ldapadcs` — det.ldapadcs
+
+**Mode:** passive  
+**Proves:** the AD-integrated CA and templates observed in the directory response; SAN flag is an ESC1 indicator  
+**Limits:** attribute/value pairing is positional; template ACLs and effective rights are not visible  
+**Output:** ldap-adcs.tsv; leads ADCSDIR-*  
+**Next:** review template ACLs and enrollment rights before testing  
+**Capture fields:** ldap.AttributeDescription, ldap.AttributeValue  
+**Reference:** https://www.thehacker.recipes/ad/movement/adcs/certificate-templates
+
+## Network (6)
 
 | When | Handler | Detects | Severity | Status |
 |---|---|---|---|---|
@@ -306,6 +317,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 | DNS queries/answers are present | `dns` | query name, record type, A/AAAA/PTR answer; attaches names to host IPs | low | implemented |
 | DHCPv6, ICMPv6 router advertisements or DNS UPDATE are present | `ipv6` | offered DNS servers, RDNSS/DNSSL, and ADIDNS dynamic updates; one host doing both is critical | critical | implemented |
 | SIP or Cisco Skinny/SCCP signalling is present | `voip` | SIP methods (REGISTER/INVITE/MESSAGE), caller/callee, Call-ID, digest auth presence; Skinny call party metadata | medium | implemented |
+| SSH, TLS, VNC or TFTP traffic is present | `fingerprints` | SSH banners, TLS SNI and version, VNC protocol/security type, TFTP file names | medium | implemented |
 
 ### `nac` — det.nac
 
@@ -353,6 +365,15 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Output:** voip.tsv; leads VOIP-*  
 **Next:** review the registrar/PBX exposure and the extension map  
 **Capture fields:** sip.Method, sip.from.user, sip.to.user, sip.Call-ID, sip.Authorization, skinny.CallingPartyNumber  
+
+### `fingerprints` — det.fingerprints
+
+**Mode:** passive  
+**Proves:** these services were exposed and which versions/encryption they offered  
+**Limits:** banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises  
+**Output:** fingerprints.tsv; leads FP-*  
+**Next:** prioritise no-auth VNC, cleartext TFTP and old SSH banners for verification  
+**Capture fields:** ssh.protocol, tls.handshake.extensions_server_name, vnc.server_proto_ver, vnc.server_security_type, tftp.source_file  
 
 ## Files (2)
 

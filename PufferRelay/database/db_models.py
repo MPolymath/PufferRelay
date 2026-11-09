@@ -307,6 +307,22 @@ def create_database(db_path=None):
             )
         """)
 
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ldap_adcs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                name TEXT,
+                dns_name TEXT,
+                template TEXT,
+                detail TEXT,
+                evidence TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                UNIQUE(kind, src_ip, dst_ip, name, template)
+            )
+        """)
+
         # SCCM/MECM and LLM/MCP traffic (issues #68, #71).
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS sccm_events (

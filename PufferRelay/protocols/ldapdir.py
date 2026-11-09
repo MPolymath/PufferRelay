@@ -20,6 +20,12 @@ def _split(value):
     return [part.strip() for part in (value or "").split(",")]
 
 
+def _pairs(attrs, values):
+    if len(attrs) == 1 and len(values) > 1:
+        return [(attrs[0], value) for value in values]
+    return list(zip(attrs, values))
+
+
 def process_ldap_directory(pcap_file):
     rows = fields(
         pcap_file,
@@ -52,7 +58,7 @@ def process_ldap_directory(pcap_file):
         attrs = _split(descriptions)
         vals = _split(values)
         state = context.setdefault((src, dst), {"account": "", "sid": "", "spns": []})
-        for attr, value in zip(attrs, vals):
+        for attr, value in _pairs(attrs, vals):
             name = attr.lower().strip()
             value = value.strip()
             if not name or not value:

@@ -24,9 +24,9 @@ pufferrelay -f capture.pcapng -q --dump out
 | `asrepcatcher.txt` | ASRepCatcher-compatible ARP/Kerberos pattern (links the upstream repo) |
 | `wsus.txt`, `nac.txt`, `dns.txt`, `ipv6.tsv` | update infrastructure, 802.1X/MAB, name map, DHCPv6/RA/ADIDNS |
 | `llm.tsv` | LLM/MCP/vector-DB endpoints and tool calls (metadata only) |
-| `kerberos-signals.tsv`, `ldap-spns.tsv`, `ldap-signing.tsv` | delegation/UnPAC signals, SPN→account/SID, signing inference |
-| `voip.tsv`, `media.tsv` | SIP/Skinny call metadata; audio/video objects already carved |
-| `rdp.tsv`, `cloud-apis.tsv` | RDP identity/negotiation; exposed infra APIs (Docker/K8s/Vault/...) |
+| `kerberos-signals.tsv`, `ldap-spns.tsv`, `ldap-signing.tsv`, `ldap-adcs.tsv` | delegation/UnPAC, SPN→account/SID, signing, CA/template objects |
+| `voip.tsv`, `media.tsv`, `rdp.tsv`, `cloud-apis.tsv`, `fingerprints.tsv` | calls, carved media, RDP identity, infra APIs, SSH/TLS/VNC/TFTP |
+| `credential-matrix.tsv`, `identity-graph.json` | identity reuse matrix and the normalized graph |
 | `report.md` / `report.html`, `diff.md`, `triage.md` | engagement report (Markdown or HTML), two-capture delta, optional localhost-LLM ranking |
 | `files.tsv` + `files/` | carved objects (client data — local only) |
 | `bloodhound/` | Legacy JSON graph (users/computers/sessions) |
@@ -35,11 +35,12 @@ pufferrelay -f capture.pcapng -q --dump out
 ## Lead prefixes
 
 `CRED`, `HASH`, `ASREP`, `KERBEROAST`/`KERBEROASTCAND`, `TOKEN`, `RELAY`,
-`COERCE`, `ADCS`, `SCCM`, `IPV6`, `DB`, `LLM`, `KERB`, `SPN`, `LDAPSIGN`,
-`CHAIN`, `VOIP`, `SMB`, `SMBFILE`, `FILE`, `NAC`, `WSUS`, `ASREPCATCHER`, `QW`.
+`COERCE`, `ADCS`, `ADCSDIR`, `SCCM`, `IPV6`, `DB`, `LLM`, `KERB`, `SPN`,
+`LDAPSIGN`, `CHAIN`, `VOIP`, `RDP`, `CLOUD`, `FP`, `WPAD`, `REUSE`, `SMB`,
+`SMBFILE`, `FILE`, `NAC`, `WSUS`, `ASREPCATCHER`, `QW`.
 Each lead's `evidence` names the source file/row; the agent feed never needs
 to re-parse the database. Leads carry `confidence` (`high` for hash/secret
-evidence, `medium` for heuristics such as coercion and delegation flags).
+evidence, `medium` for heuristics) and ATT&CK technique IDs.
 
 ## Lead shape
 

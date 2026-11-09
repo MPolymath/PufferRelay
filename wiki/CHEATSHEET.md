@@ -53,6 +53,8 @@ pufferrelay -r --has-creds --json                   # ask the database
 | RDP negotiation or client data is present | `rdp` | rdp.tsv; leads RDP-* | CredSSP passwords are encrypted; identity extraction depends on client data being visible |
 | Docker, Kubernetes, kubelet, etcd, Consul, Vault or Veeam ports carry HTTP | `cloudapi` | cloud-apis.tsv; leads CLOUD-* | TLS is opaque; only the request side is seen, and a 401 response cannot be distinguished from success |
 | SIP or Cisco Skinny/SCCP signalling is present | `voip` | voip.tsv; leads VOIP-* | media (RTP) is not decoded; TLS/SIPS is opaque; digest challenges are not cracked |
+| SSH, TLS, VNC or TFTP traffic is present | `fingerprints` | fingerprints.tsv; leads FP-* | banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises |
+| LDAP search results contain pKIEnrollmentService or pKICertificateTemplate objects | `ldapadcs` | ldap-adcs.tsv; leads ADCSDIR-* | attribute/value pairing is positional; template ACLs and effective rights are not visible |
 | -q is used, or -f is combined with -q | `quickwins` | quick_wins table; leads QW-* | presence is not exploitability; signing may be enforced elsewhere |
 
 ## Active modes (opt-in, warned, authorized)

@@ -161,6 +161,16 @@ def main():
     parser = argparse.ArgumentParser(
         description="PufferRelay - passive network capture analyzer"
     )
+    from PufferRelay import __version__
+
+    parser.add_argument(
+        "--version", action="version", version=f"pufferrelay {__version__}"
+    )
+    parser.add_argument(
+        "--detections",
+        action="store_true",
+        help="Print the detection catalog (handler, class, mode, severity, status)",
+    )
     parser.add_argument("-f", "--file", help="PCAP file to analyze")
     parser.add_argument("-r", "--read", action="store_true", help="Read from database")
     parser.add_argument(
@@ -180,7 +190,8 @@ def main():
         help="Run only these handlers, comma separated "
         "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,kerberos,"
         "kerberosdepth,kerberoast,ldapdir,httptokens,coercion,adcs,ipv6,dbcreds,"
-        "smbobjects,sccm,llm,voip,rdp,cloudapi,services,dns,asrepcatcher,ips)",
+        "smbobjects,sccm,llm,voip,rdp,cloudapi,fingerprints,ldapadcs,services,"
+        "dns,asrepcatcher,ips)",
     )
     parser.add_argument(
         "--credentials-only",
@@ -222,7 +233,8 @@ def main():
         help="With -r: show the raw rows of these protocols "
         "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,kerberos,"
         "kerberosdepth,kerberoast,ldapdir,httptokens,coercion,adcs,ipv6,dbcreds,"
-        "sccm,llm,voip,rdp,cloudapi,services,dns,asrepcatcher,ips)",
+        "sccm,llm,voip,rdp,cloudapi,fingerprints,ldapadcs,services,dns,"
+        "asrepcatcher,ips)",
     )
     parser.add_argument(
         "--ip",
@@ -251,11 +263,31 @@ def main():
         help="Max rows per table for -r filters (default 500)",
     )
     parser.add_argument(
+        "--chunk-packets",
+        type=int,
+        default=0,
+        metavar="N",
+        help="Split the capture into N-packet chunks with editcap, store each, "
+        "and resume from a checkpoint after interruption (0 disables)",
+    )
+    parser.add_argument(
         "--report",
         nargs="?",
         const="",
         metavar="FILE",
-        help="Write a Markdown engagement report (default: output_dir/report.md)",
+        help="Write a Markdown or HTML engagement report "
+        "(default: output_dir/report.md)",
+    )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="Run independent handlers in N parallel tshark processes (default 1)",
+    )
+    parser.add_argument(
+        "--report-meta",
+        metavar="FILE",
+        help="JSON metadata for --report (title, client, assessor, scope)",
     )
     parser.add_argument(
         "--triage",
@@ -382,6 +414,16 @@ def main():
     setup_logger(getattr(logging, args.log_level or settings["log_level"]))
 
     machine = bool(args.json or args.creds or args.inventory)
+
+    if args.detections:
+        from PufferRelay.catalog import summarize
+
+        for row in summarize():
+            print(
+                f"{row['handler']}\t{row['class']}\t{row['mode']}\t"
+                f"{row['severity']}\t{row['status']}"
+            )
+        return
 
     # Query filters and report generation imply reading an existing database.
     if args.ip or args.user or args.has_creds or args.table:
@@ -526,12 +568,24 @@ def main():
             elif args.file:
                 from PufferRelay.pcap_processing.pcap_parser import parse_pcap
 
-                parsed_data = parse_pcap(
-                    args.file,
-                    only=only,
-                    credentials_only=args.credentials_only,
-                )
-                process_extracted_data(parsed_data)
+                if args.chunk_packets:
+                    from PufferRelay.pcap_processing.chunker import run_chunked
+
+                    parsed_data = run_chunked(
+                        args.file,
+                        only=only,
+                        credentials_only=args.credentials_only,
+                        jobs=args.jobs,
+                        packets_per_chunk=args.chunk_packets,
+                    )
+                else:
+                    parsed_data = parse_pcap(
+                        args.file,
+                        only=only,
+                        credentials_only=args.credentials_only,
+                        jobs=args.jobs,
+                    )
+                    process_extracted_data(parsed_data)
 
                 # ASRepCatcher-compatible traffic is worth interrupting the
                 # operator for: it means Kerberos hashes may already be leaving
@@ -660,9 +714,22 @@ def main():
                 report_path = args.report or os.path.join(
                     get_output_dir() or "out", "report.md"
                 )
+                report_meta = None
+                if args.report_meta:
+                    try:
+                        with open(args.report_meta, encoding="utf-8") as handle:
+                            report_meta = json.load(handle)
+                    except (OSError, ValueError) as meta_error:
+                        print(
+                            f"report metadata error: {meta_error}", file=sys.stderr
+                        )
+                        sys.exit(2)
                 try:
                     written = report_module.write_report(
-                        conn, report_path, pcap_name=args.file or args.quick_wins or ""
+                        conn,
+                        report_path,
+                        pcap_name=args.file or args.quick_wins or "",
+                        meta=report_meta,
                     )
                 except Exception as report_error:
                     logging.error("Report generation failed: %s", report_error)

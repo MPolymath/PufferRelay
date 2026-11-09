@@ -252,7 +252,7 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, normalized)
             logging.debug(f"Inserted {cursor.rowcount} database credentials")
-        elif protocol in ("rdp", "cloudapi"):
+        elif protocol in ("rdp", "cloudapi", "fingerprints"):
             rows = [
                 (protocol,) + tuple(row) + ("",) * (7 - len(row))
                 if len(row) < 7
@@ -291,6 +291,14 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} LDAP SPN rows")
+        elif protocol == "ldapadcs":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO ldap_adcs
+                    (kind, severity, name, dns_name, template, detail, evidence,
+                     src_ip, dst_ip)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} LDAP ADCS objects")
         elif protocol == "voip":
             cursor.executemany("""
                 INSERT OR IGNORE INTO voip_calls
@@ -418,6 +426,9 @@ PROTOCOL_TABLES = {
     "cloudapi": ("service_events",
                  ["protocol", "kind", "severity", "src_ip", "dst_ip",
                   "principal", "detail"]),
+    "fingerprints": ("service_events",
+                     ["protocol", "kind", "severity", "src_ip", "dst_ip",
+                      "principal", "detail"]),
     "smbobjects": ("captured_files",
                    ["protocol", "src_ip", "dst_ip", "filename", "content_type",
                     "size", "sha256"]),
@@ -431,6 +442,9 @@ PROTOCOL_TABLES = {
                        "src_ip", "dst_ip", "detail"]),
     "ldapdir": ("ldap_spns",
                 ["account", "spn", "sid", "src_ip", "dst_ip"]),
+    "ldapadcs": ("ldap_adcs",
+                 ["kind", "severity", "name", "dns_name", "template", "detail",
+                  "src_ip", "dst_ip"]),
     "voip": ("voip_calls",
              ["kind", "severity", "src_ip", "dst_ip", "caller", "callee",
               "call_id", "detail"]),

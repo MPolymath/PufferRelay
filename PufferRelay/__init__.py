@@ -27,3 +27,5 @@ from .config import *
 from .protocols import *
 from .database import *
 from .utils import *
+
+__version__ = "1.1.0"

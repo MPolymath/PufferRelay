@@ -15,13 +15,15 @@ misses, output, next step) is **[DETECTIONS.md](DETECTIONS.md)**, generated from
 | DNS | queries/answers (A, AAAA, PTR, ...), name↔IP map, `dns.txt` |
 | AD | SMB share/file names, printer shares, relay candidates (SMB signing flags + NTLM over SMB/LDAP/HTTP) |
 | Kerberos attacks | Kerberoasting (hashcat 13100/19600/19700), S4U/delegation flags, UnPAC chains, ASRepCatcher-compatible ARP/relay pattern, AS-REP roastable accounts |
-| AD directory | SPN→account mapping and objectSID from LDAP results; LDAP signing inference |
-| Attack chains | coercion + credential/hash + relay target, and credential + relay target correlations |
+| AD directory | SPN→account, objectSID and ADCS CA/template (incl. ESC1 SAN flag) from LDAP results; LDAP signing inference |
+| Identity graph | normalized users, host/session edges, credential matrix and reuse leads |
+| Attack chains | coercion + credential/hash + relay, LDAP-signing and ADCS relay chains, with missing evidence and confidence |
+| Fingerprints | SSH banners, TLS SNI/version, VNC security type, TFTP file names |
 | VoIP | SIP registrations/calls (digest presence), Skinny/SCCP call metadata |
 | Remote access | RDP negotiation/protocols and client identity when visible |
 | Infrastructure APIs | Docker/Kubernetes/kubelet/etcd/Consul/Vault/Veeam exposure and missing auth |
-| Reporting | `report.md`/`report.html`, two-capture `diff.md`, optional loopback-Ollama triage |
-| Profiling | `--auto` selects handlers from the observed services |
+| Reporting | `report.md`/`report.html` (ATT&CK, confidence, cleanup), two-capture `diff.md`, optional loopback-Ollama triage |
+| Profiling / scale | `--auto` handler selection, `--jobs` parallel passes, `--chunk-packets` chunked parse with resume |
 | Secrets | HTTP bearer/JWT/Vault/GitLab/GitHub/AWS tokens (fingerprinted in exports), database auth material |
 | AD exposure | RPC coercion attempts, ADCS enrollment/PKINIT, SCCM management traffic, relay candidates |
 | AI infrastructure | LLM endpoints/API usage, unauthenticated inference, MCP tool calls, vector DBs |
@@ -37,8 +39,9 @@ misses, output, next step) is **[DETECTIONS.md](DETECTIONS.md)**, generated from
 `wsus.txt`, `nac.txt`, `dns.txt`, `asrepcatcher.txt`, `kerberoast-hashes.txt`,
 `tokens.tsv`, `coercions.tsv`, `adcs.tsv`, `ipv6.tsv`, `db-creds.tsv`,
 `sccm.tsv`, `llm.tsv`, `kerberos-signals.tsv`, `ldap-spns.tsv`,
-`ldap-signing.tsv`, `voip.tsv`, `media.tsv`, `files.tsv` + `files/`,
-`bloodhound/`, `summary.json`.
+`ldap-signing.tsv`, `ldap-adcs.tsv`, `voip.tsv`, `media.tsv`, `rdp.tsv`,
+`cloud-apis.tsv`, `fingerprints.tsv`, `credential-matrix.tsv`,
+`identity-graph.json`, `files.tsv` + `files/`, `bloodhound/`, `summary.json`.
 
 ## Agent feed
 

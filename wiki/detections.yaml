@@ -513,6 +513,36 @@
   references: ""
   status: implemented
 
+- id: det.fingerprints
+  class: network
+  handler: fingerprints
+  mode: passive
+  when: "SSH, TLS, VNC or TFTP traffic is present"
+  detects: "SSH banners, TLS SNI and version, VNC protocol/security type, TFTP file names"
+  proves: "these services were exposed and which versions/encryption they offered"
+  limits: "banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises"
+  fields: "ssh.protocol, tls.handshake.extensions_server_name, vnc.server_proto_ver, vnc.server_security_type, tftp.source_file"
+  output: "fingerprints.tsv; leads FP-*"
+  severity: medium
+  next: "prioritise no-auth VNC, cleartext TFTP and old SSH banners for verification"
+  references: ""
+  status: implemented
+
+- id: det.ldapadcs
+  class: ad
+  handler: ldapadcs
+  mode: passive
+  when: "LDAP search results contain pKIEnrollmentService or pKICertificateTemplate objects"
+  detects: "CA name/DNS host/published templates, and template SAN/enrollment flags"
+  proves: "the AD-integrated CA and templates observed in the directory response; SAN flag is an ESC1 indicator"
+  limits: "attribute/value pairing is positional; template ACLs and effective rights are not visible"
+  fields: "ldap.AttributeDescription, ldap.AttributeValue"
+  output: "ldap-adcs.tsv; leads ADCSDIR-*"
+  severity: high
+  next: "review template ACLs and enrollment rights before testing"
+  references: "https://www.thehacker.recipes/ad/movement/adcs/certificate-templates"
+  status: partial
+
 - id: det.quickwins
   class: weakness
   handler: quickwins

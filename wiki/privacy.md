@@ -18,6 +18,9 @@ Client captures are confidential. Full rules: [`docs/PRIVACY.md`](../docs/PRIVAC
   metadata. They stay local and are never logged.
 - LLM/MCP detection exports metadata only (service, endpoint, model, tool
   names); prompts and answers are not written by default.
+- `credential-matrix.tsv` and `identity-graph.json` contain identities, hosts
+  and secret fingerprints; `diff.md` can reveal the same. Treat them like the
+  export pack.
 - `report.md` or `report.html` is a confidential artifact: it contains real
   credentials, hashes and internal hosts. `diff.md` compares two databases and
   can reveal the same secrets. `--triage` sends only lead metadata to a

@@ -76,9 +76,13 @@ pufferrelay -r --json
 | `--proxy --proxy-target HOST:PORT` | **ACTIVE** local TCP relay, JSONL recording |
 | `--commands` / `--serveme` | text-only command generators (nothing executed) |
 | `--auto` | profile the capture's services and run only the relevant handlers |
+| `--jobs N` | run independent handlers in N parallel tshark processes |
+| `--chunk-packets N` | split with editcap, store each chunk, resume after interruption |
 | `--report [FILE]` | Markdown or HTML engagement report (default `output_dir/report.md`) |
+| `--report-meta FILE` | JSON title/client/assessor/scope for the report |
 | `--diff DB` | compare with another database and write `diff.md` |
 | `--triage` | rank leads with a **loopback-only** Ollama model (off by default) |
+| `--detections` / `--version` | print the catalog / version |
 | `--config FILE` / `--db PATH` | JSON config file and database override |
 
 Active modes print a red warning and require `authorized` (or

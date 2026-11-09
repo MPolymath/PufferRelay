@@ -23,8 +23,11 @@ serves `kerberos`, `kerberoast`, `asrepcatcher` and `kerberosdepth` in one).
 
 **Auto profile (`--auto`) is the big lever**: the same capture selected 10
 handlers / 14 passes and parsed in **6.7 s** — the services pass picks the
-protocol families, and everything else is skipped. Use `--auto` on an unknown
-capture; use `--only` when you already know what you need.
+protocol families, and everything else is skipped. `--jobs N` runs independent
+handlers in parallel tshark processes (memory scales with N); `--chunk-packets
+N` splits very large captures with editcap and resumes from a checkpoint after
+an interruption. Use `--auto` on an unknown capture; use `--only` when you
+already know what you need.
 
 The loading screen shows `handler 3/34 ftp | elapsed 00:12 | ETA 00:41`; the
 same line is logged at INFO so long runs are predictable.
