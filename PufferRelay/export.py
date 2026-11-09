@@ -21,7 +21,7 @@ import time
 from collections import defaultdict
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
-from PufferRelay.protocols.smb_handler import interesting_file
+from PufferRelay.protocols.helpers import interesting_file
 
 EXPORT_SCHEMA = 1
 

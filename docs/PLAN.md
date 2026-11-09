@@ -105,7 +105,8 @@ Everything else follows the table above; do Tier S completely before Tier A.
 | `29baabf` | #15 BloodHound Legacy JSON export from observed identities/sessions |
 | `14d9e95` | #39 quick-win severity + evidence in DB and lead feed |
 | `9848b43` | wiki/ source pages; #30 NAC/802.1X and #14 WSUS detection |
-| (this commit) | #45 ETA/countdown and #19 JSON config with CLI/env overrides |
+| `b48a82a` | #45 ETA/countdown and #19 JSON config with CLI/env overrides |
+| (this commit) | #53 cleanup: legacy pyshark handlers removed, helpers module |
 
 Test status: 26 pytest tests passing locally and in CI (tshark installed),
 including a synthetic-pcap end-to-end and a CLI subprocess test. Every feature

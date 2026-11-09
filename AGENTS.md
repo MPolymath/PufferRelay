@@ -56,10 +56,11 @@ PufferRelay/
   tshark_fields.py       one-pass `tshark -T fields` extraction (fast path)
   protocols/
     fields_handlers.py   field-based implementations of the protocol handlers
+    helpers.py           shared HTTP/NetBIOS/SMB/relay/Kerberos logic
   protocols/
     __init__.py          exports every process_* handler
-    <proto>_handler.py   legacy pyshark handlers (unused; kept for reference
-                         until the cleanup commit)
+    nac_handler.py       EAP/RADIUS (802.1X/MAB) observations
+    wsus_handler.py      WSUS/Windows Update endpoints
     quick_wins.py        regex sweep over every packet for "quick win" flags
   database/
     db_models.py         CREATE TABLE IF NOT EXISTS + quick_wins seed

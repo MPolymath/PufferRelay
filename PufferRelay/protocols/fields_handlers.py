@@ -33,11 +33,17 @@ import binascii
 import logging
 import urllib.parse
 
-from PufferRelay.protocols.http_handler import clean_http_data, decode_basic_auth
-from PufferRelay.protocols.kerberos_handler import asrep_hash
-from PufferRelay.protocols.netbios_handler import get_service_type
-from PufferRelay.protocols.relay_handler import classify, protocol_for_port
-from PufferRelay.protocols.smb_handler import is_printer, normalise_file, normalise_share
+from PufferRelay.protocols.helpers import (
+    asrep_hash,
+    classify,
+    clean_http_data,
+    decode_basic_auth,
+    get_service_type,
+    is_printer,
+    normalise_file,
+    normalise_share,
+    protocol_for_port,
+)
 from PufferRelay.tshark_fields import fields
 
 

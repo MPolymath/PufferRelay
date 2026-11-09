@@ -9,7 +9,7 @@ import pytest
 from PufferRelay.database.db_models import create_database
 from PufferRelay.database.db_queries import insert_into_database
 from PufferRelay.export import write_exports
-from PufferRelay.protocols.relay_handler import (
+from PufferRelay.protocols.helpers import (
     classify,
     protocol_for_port,
     smb_signing_missing_hosts,
@@ -85,7 +85,7 @@ def test_process_relays_returns_empty_without_ntlm():
     pytest.importorskip("scapy")
     from scapy.all import Ether, IP, Raw, TCP, wrpcap
 
-    from PufferRelay.protocols.relay_handler import process_relays
+    from PufferRelay.protocols.fields_handlers import process_relays
 
     with tempfile.TemporaryDirectory() as tmp:
         pcap = os.path.join(tmp, "plain.pcap")

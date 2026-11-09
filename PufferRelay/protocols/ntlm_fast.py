@@ -32,10 +32,9 @@ import base64
 import codecs
 import logging
 import re
+import struct
 
 from PufferRelay.tshark_fields import fields
-
-from .ntlm_handler import parse_ntlm_hash
 
 NTLMSSP_CHALLENGE = re.compile(b"NTLMSSP\x00\x02\x00\x00\x00", re.DOTALL)
 NTLMSSP_AUTH = re.compile(b"NTLMSSP\x00\x03\x00\x00\x00", re.DOTALL)
@@ -70,6 +69,69 @@ def _add_hash(out, processed, src, dst, raw, challenge):
         return
     processed.add(hash_id)
     out.append((src, dst, result[1], result[0]))
+
+
+def parse_ntlm_hash(packet_data, challenge):
+    """
+    Extracts NTLM hashes from packet data using Pcredz logic.
+    
+    Args:
+        packet_data (bytes): Raw packet data containing NTLM message
+        challenge (bytes): The challenge value from NTLM type 2 message
+        
+    Returns:
+        tuple: (formatted_hash, user_domain) or None if parsing fails
+    """
+    try:
+        # Find the start of NTLMSSP message
+        ntlmssp_start = packet_data.find(b'NTLMSSP\x00\x03')
+        if ntlmssp_start == -1:
+            logging.error("NTLMSSP3 signature not found")
+            return None
+            
+        # Adjust packet_data to start at NTLMSSP message
+        packet_data = packet_data[ntlmssp_start:]
+        
+        # Extract LM hash
+        lmhash_len = struct.unpack('<H', packet_data[12:14])[0]
+        lmhash_offset = struct.unpack('<H', packet_data[16:18])[0]
+        lmhash = codecs.encode(packet_data[lmhash_offset:lmhash_offset+lmhash_len], "hex").upper()
+
+        # Extract NT hash
+        nthash_len = struct.unpack('<H', packet_data[20:22])[0]
+        nthash_offset = struct.unpack('<H', packet_data[24:26])[0]
+        
+        # For NTLMv2, the NT hash includes the response
+        if nthash_len > 24:  # NTLMv2
+            # Extract the actual NT hash (first 16 bytes) and the response
+            nthash = codecs.encode(packet_data[nthash_offset:nthash_offset+16], "hex").upper()
+            response = codecs.encode(packet_data[nthash_offset+16:nthash_offset+nthash_len], "hex").upper()
+        else:  # NTLMv1
+            nthash = codecs.encode(packet_data[nthash_offset:nthash_offset+nthash_len], "hex").upper()
+
+        # Extract domain and username
+        domain_len = struct.unpack('<H', packet_data[28:30])[0]
+        domain_offset = struct.unpack('<H', packet_data[32:34])[0]
+        domain = packet_data[domain_offset:domain_offset+domain_len].replace(b"\x00", b"")
+
+        user_len = struct.unpack('<H', packet_data[36:38])[0]
+        user_offset = struct.unpack('<H', packet_data[40:42])[0]
+        user = packet_data[user_offset:user_offset+user_len].replace(b"\x00", b"")
+
+        # Format the hash based on NTLM version
+        if nthash_len == 24:  # NTLMv1
+            writehash = f"{user.decode('latin-1')}::{domain.decode('latin-1')}:{lmhash.decode('latin-1')}:{nthash.decode('latin-1')}:{challenge.decode('latin-1')}"
+            return f"NTLMv1 complete hash is: {writehash}", f"{user.decode('latin-1')}::{domain.decode('latin-1')}"
+        elif nthash_len > 24:  # NTLMv2
+            # For NTLMv2, we use the challenge directly from the NTLMSSP2 message
+            writehash = f"{user.decode('latin-1')}::{domain.decode('latin-1')}:{challenge.decode('latin-1')}:{nthash.decode('latin-1')}:{response.decode('latin-1')}"
+            return f"NTLMv2 complete hash is: {writehash}", f"{user.decode('latin-1')}::{domain.decode('latin-1')}"
+        
+        logging.warning(f"Unexpected NT hash length: {nthash_len}")
+        return None
+    except Exception as e:
+        logging.error(f"Error parsing NTLM hash: {str(e)}")
+        return None
 
 
 def process_ntlm(pcap_file):

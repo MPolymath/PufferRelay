@@ -9,12 +9,12 @@ import pytest
 from PufferRelay.database.db_models import create_database
 from PufferRelay.database.db_queries import insert_into_database
 from PufferRelay.export import write_exports
-from PufferRelay.protocols.smb_handler import (
+from PufferRelay.protocols.fields_handlers import process_smb
+from PufferRelay.protocols.helpers import (
     interesting_file,
     is_printer,
     normalise_file,
     normalise_share,
-    process_smb,
 )
 
 BACKSLASH = chr(92)

@@ -9,7 +9,7 @@ import pytest
 from PufferRelay.database.db_models import create_database
 from PufferRelay.database.db_queries import insert_into_database
 from PufferRelay.export import collect_hashes, write_exports
-from PufferRelay.protocols.kerberos_handler import asrep_hash, normalise_hex
+from PufferRelay.protocols.helpers import asrep_hash, normalise_hex
 
 PAYLOAD = "0" * 64  # 32 bytes of cipher hex: 16 checksum + data
 
@@ -61,7 +61,7 @@ def test_process_kerberos_returns_empty_without_kerberos():
     pytest.importorskip("scapy")
     from scapy.all import Ether, IP, Raw, TCP, wrpcap
 
-    from PufferRelay.protocols.kerberos_handler import process_kerberos
+    from PufferRelay.protocols.fields_handlers import process_kerberos
 
     with tempfile.TemporaryDirectory() as tmp:
         pcap = os.path.join(tmp, "plain.pcap")

@@ -264,7 +264,7 @@ def main():
 
                 # Relay findings feed the SMB-signing quick win so it shows up
                 # in every view (table, report, agent feed).
-                from PufferRelay.protocols.relay_handler import smb_signing_missing_hosts
+                from PufferRelay.protocols.helpers import smb_signing_missing_hosts
 
                 signing_missing = smb_signing_missing_hosts(parsed_data.get("relays", []))
                 if signing_missing:
