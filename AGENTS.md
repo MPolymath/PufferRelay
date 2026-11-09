@@ -51,6 +51,13 @@ mirror) and now wants to know *what can I attack next, with what command*.
 7. **Schema is versioned.** `PufferRelay/database/db_version.py` owns the
    version. Any table/column change bumps it and ships a migration path or a
    clear "delete the old DB" message.
+8. **Check the attack library before feature work.** On the first tool session
+   of a day, run `python scripts/library.py update` and
+   `python scripts/library.py new --tag <relevant tags>` in
+   `C:\Users\33695\Documents\Projects\Python\GIT\attack-library`
+   (PufferRelay tags: active-directory, kerberos, ntlm, ldap, smb, dns,
+   network, web, llm-ai, ci-supply-chain). Park non-ROI articles with
+   `mark --tag`; only incorporate what the capture can actually prove.
 
 ## 3. Architecture map
 

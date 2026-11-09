@@ -30,6 +30,19 @@ status board.
 - [x] ASRepCatcher-compatible detection: ARP spoofing + relayed AS-REQ /
   diverted crackable AS-REP; critical when both overlap; leads and
   `asrepcatcher.txt` link <https://github.com/Yaxxine7/ASRepCatcher>.
+
+### Proposed detections from the attack library (drafts, not filed yet)
+
+Full issue bodies: `../attack-library/pufferrelay-issues/`.
+
+- [ ] Kerberoasting: TGS-REP hash extraction (hashcat 13100/19600/19700).
+- [ ] RPC coercion: MS-EFSRPC / MS-RPRN / MS-DFSNM / MS-FSRVP over SMB pipes.
+- [ ] DHCPv6 / IPv6 RA takeover and ADIDNS dynamic-update abuse.
+- [ ] ADCS enrollment (HTTP/DCOM, ESC8) and PKINIT AS-REQ detection.
+- [ ] SCCM/MECM management-point, distribution-point and client-push traffic.
+- [ ] Database auth material: MySQL, PostgreSQL, Redis (MSSQL via NTLM).
+- [ ] HTTP bearer/JWT/API tokens (Vault, GitLab, GitHub, AWS) with redaction.
+- [ ] LLM/MCP/vector-DB endpoints, API keys and tool-call metadata.
 - [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM
