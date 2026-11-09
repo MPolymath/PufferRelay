@@ -23,6 +23,7 @@ It focuses on parsing and analyzing network traffic to surface sensitive or acti
 #### ⚗️PIPX
 sudo apt install tshark <br>
 pipx install pufferrelay <br>
+# PyPI: https://pypi.org/project/pufferrelay/
 #### 👨🏿‍🔧PIP
 python3 -m venv venv <br>
 source venv/bin/activate.fish <br>
