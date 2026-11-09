@@ -49,7 +49,9 @@ def test_catalog_covers_handlers_and_cli():
         timeout=60,
     )
     assert version.returncode == 0
-    assert "1.1.0" in (version.stdout + version.stderr)
+    from PufferRelay import __version__
+
+    assert __version__ in (version.stdout + version.stderr)
 
 
 def test_ldap_adcs_ca_and_template(monkeypatch):
