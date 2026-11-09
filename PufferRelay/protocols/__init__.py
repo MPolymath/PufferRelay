@@ -47,6 +47,8 @@ from .adcs import process_adcs
 from .ipv6_adidns import process_ipv6_adidns
 from .database_auth import process_database_auth
 from .smb_objects import process_smb_objects
+from .sccm import process_sccm
+from .llm_traffic import process_llm_traffic
 
 __all__ = [
     'process_ldap',
@@ -75,5 +77,7 @@ __all__ = [
     'process_adcs',
     'process_ipv6_adidns',
     'process_database_auth',
-    'process_smb_objects'
+    'process_smb_objects',
+    'process_sccm',
+    'process_llm_traffic'
 ]

@@ -263,6 +263,39 @@ def create_database(db_path=None):
             )
         """)
 
+        # SCCM/MECM and LLM/MCP traffic (issues #68, #71).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sccm_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                host TEXT,
+                uri TEXT,
+                share TEXT,
+                evidence TEXT,
+                UNIQUE(kind, src_ip, dst_ip, uri, share)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS llm_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                service TEXT,
+                host TEXT,
+                path TEXT,
+                model TEXT,
+                auth TEXT,
+                detail TEXT,
+                evidence TEXT,
+                UNIQUE(kind, src_ip, dst_ip, host, path, detail)
+            )
+        """)
+
         # Kerberoasting, tokens, coercion, ADCS, IPv6/ADIDNS, database auth.
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS kerberoast (

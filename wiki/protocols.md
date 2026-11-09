@@ -145,6 +145,24 @@ narrow: a capture proves traffic, not intent.
   (8 MiB/object, 16 MiB/capture).
 - Proves: the file content, not just the name seen in CREATE frames.
 
+## SCCM / MECM
+- HTTP markers `/SMS_MP`, `ccmhttp`, `/CCM_System`, `Content_*`, `SMSPKG`,
+  `.pkg`; SMB trees `SMS_SITE`/`SMSPKG$`.
+- Proves: management-point/distribution-point traffic; NTLM to an MP is
+  flagged high (relay candidate). Package delivery alone is inventory.
+- Limit: the SMS Provider DCOM interfaces are not resolved; client-push is
+  inferred from SMB, not from a policy object.
+
+## LLM / MCP / vector DB
+- Hosts/ports (OpenAI, Anthropic, Google, Ollama 11434, Gradio 7860, Qdrant
+  6333, Milvus 19530), paths (`/api/generate`, `/v1/chat/completions`, `/mcp`,
+  `/sse`), and JSON bodies (`model`, `messages`, `tools`, `method`).
+- Proves: which model/service is in use, whether an auth header was present,
+  and MCP tool calls (method + tool names). Metadata only: prompts and answers
+  are not exported.
+- Limit: TLS is opaque; local services on ambiguous ports (8080/8000) are only
+  recognised by path markers.
+
 ## Files
 - HTTP response bodies and FTP-DATA objects, sha256, size, safe name.
 - Limit: objects split across many TCP segments depend on tshark reassembly.

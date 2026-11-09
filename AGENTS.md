@@ -89,6 +89,8 @@ PufferRelay/
     ipv6_adidns.py       DHCPv6/RA DNS takeover + ADIDNS updates
     database_auth.py     Redis/MySQL/PostgreSQL auth material
     smb_objects.py       tshark SMB object export -> captured_files
+    sccm.py              SCCM/MECM management and distribution traffic
+    llm_traffic.py       LLM/MCP/vector-DB endpoints and tool calls
     quick_wins.py        regex sweep over every packet for "quick win" flags
   database/
     db_models.py         CREATE TABLE IF NOT EXISTS + quick_wins seed
@@ -97,7 +99,7 @@ PufferRelay/
   utils/
     display.py           Rich tables/panels
     loading_animation.py spinner + READY banner
-  tests/                 pytest suite (104 tests: pure, DB, e2e pcap, CLI, relay)
+  tests/                 pytest suite (107 tests: pure, DB, e2e pcap, CLI, relay)
 ```
 
 Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->

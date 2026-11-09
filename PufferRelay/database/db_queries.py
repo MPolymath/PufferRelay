@@ -257,6 +257,21 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} SMB objects")
+        elif protocol == "sccm":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO sccm_events
+                    (kind, severity, src_ip, dst_ip, host, uri, share, evidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} SCCM events")
+        elif protocol == "llm":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO llm_events
+                    (kind, severity, src_ip, dst_ip, service, host, path, model,
+                     auth, detail, evidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} LLM/MCP events")
         elif protocol == "services":
             # (ip, port, service, transport) observed in the capture
             cursor.executemany("""
@@ -358,6 +373,11 @@ PROTOCOL_TABLES = {
     "smbobjects": ("captured_files",
                    ["protocol", "src_ip", "dst_ip", "filename", "content_type",
                     "size", "sha256"]),
+    "sccm": ("sccm_events",
+             ["kind", "severity", "src_ip", "dst_ip", "host", "uri", "share"]),
+    "llm": ("llm_events",
+            ["kind", "severity", "src_ip", "dst_ip", "service", "host", "path",
+             "model", "auth"]),
 }
 
 

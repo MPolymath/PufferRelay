@@ -46,6 +46,8 @@ from PufferRelay.protocols import (
     process_ipv6_adidns,
     process_database_auth,
     process_smb_objects,
+    process_sccm,
+    process_llm_traffic,
 )
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
@@ -81,6 +83,8 @@ HANDLERS = {
     "ipv6": process_ipv6_adidns,
     "dbcreds": process_database_auth,
     "smbobjects": process_smb_objects,
+    "sccm": process_sccm,
+    "llm": process_llm_traffic,
     "services": process_services,
     "ips": process_ips,
 }

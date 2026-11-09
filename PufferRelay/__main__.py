@@ -174,7 +174,7 @@ def main():
         "--only",
         help="Run only these handlers, comma separated "
         "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,kerberos,"
-        "kerberoast,httptokens,coercion,adcs,ipv6,dbcreds,smbobjects,"
+        "kerberoast,httptokens,coercion,adcs,ipv6,dbcreds,smbobjects,sccm,llm,"
         "services,dns,asrepcatcher,ips)",
     )
     parser.add_argument(
@@ -216,7 +216,8 @@ def main():
         "--protocol",
         help="With -r: show the raw rows of these protocols "
         "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,kerberos,kerberoast,"
-        "httptokens,coercion,adcs,ipv6,dbcreds,services,dns,asrepcatcher,ips)",
+        "httptokens,coercion,adcs,ipv6,dbcreds,sccm,llm,services,dns,"
+        "asrepcatcher,ips)",
     )
     parser.add_argument(
         "--ip",

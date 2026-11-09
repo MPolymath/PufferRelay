@@ -767,6 +767,65 @@ def collect_database_creds(conn: sqlite3.Connection) -> List[Dict]:
     return out
 
 
+def collect_sccm(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "sccm_events"):
+        return out
+    for kind, severity, src, dst, host, uri, share, evidence in _rows(
+        conn,
+        "SELECT kind, severity, src_ip, dst_ip, host, uri, share, evidence "
+        "FROM sccm_events",
+    ):
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "medium",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "host": host or "",
+                "uri": uri or "",
+                "share": share or "",
+                "evidence": parsed,
+            }
+        )
+    return out
+
+
+def collect_llm(conn: sqlite3.Connection) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "llm_events"):
+        return out
+    for kind, severity, src, dst, service, host, path, model, auth, detail, evidence in _rows(
+        conn,
+        "SELECT kind, severity, src_ip, dst_ip, service, host, path, model, auth, "
+        "detail, evidence FROM llm_events",
+    ):
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "medium",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "service": service or "",
+                "host": host or "",
+                "path": path or "",
+                "model": model or "",
+                "auth": auth or "no",
+                "detail": detail or "",
+                "evidence": parsed,
+            }
+        )
+    return out
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
     return {
         "hosts": collect_hosts(conn),
@@ -787,6 +846,8 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "adcs": collect_adcs(conn),
         "ipv6": collect_ipv6(conn),
         "database_credentials": collect_database_creds(conn),
+        "sccm": collect_sccm(conn),
+        "llm": collect_llm(conn),
     }
 
 
@@ -1222,6 +1283,54 @@ def build_leads(inventory: Dict) -> List[Dict]:
                     {
                         "intent": "Crack the response offline",
                         "command": "hashcat with the matching database mode",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3i. SCCM/MECM management traffic.
+    for i, row in enumerate(inventory.get("sccm", []), start=1):
+        add(
+            {
+                "id": f"SCCM-{i:03d}",
+                "severity": row["severity"],
+                "title": f"SCCM {row['kind']}"
+                + (f" at {row['host']}" if row["host"] else ""),
+                "why": "SCCM management/distribution traffic was observed. "
+                "Management points and site shares are high-value relay and "
+                "site-takeover targets.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the SCCM endpoint and authentication",
+                        "command": "inspect sccm.tsv and the matching HTTP/SMB flow",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3j. LLM / MCP / vector-DB traffic.
+    for i, row in enumerate(inventory.get("llm", []), start=1):
+        add(
+            {
+                "id": f"LLM-{i:03d}",
+                "severity": row["severity"],
+                "title": f"{row['kind']}: {row['service']}"
+                + (f" ({row['host']})" if row["host"] else ""),
+                "why": (
+                    "An inference endpoint answered without an authentication "
+                    "header; anyone who can reach it can use the model."
+                    if row["kind"] == "llm-unauthenticated"
+                    else "LLM/MCP traffic was observed; it can expose prompts, "
+                    "tool calls and API keys."
+                ),
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the service and whether it should be reachable",
+                        "command": "inspect llm.tsv and the matching HTTP flow",
                         "active": False,
                     }
                 ],
@@ -1880,6 +1989,27 @@ def write_exports(
             f"{row['destination_ip'] or '-'}	{row['username'] or '-'}	"
             f"{row['secret'] or '-'}	{row['kind']}	{row['server'] or '-'}"
             for row in inventory.get("database_credentials", [])
+        ],
+    )
+    _write_text(
+        path("sccm.tsv"),
+        ["kind	severity	src	dst	host	uri	share"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['host'] or '-'}	"
+            f"{row['uri'] or '-'}	{row['share'] or '-'}"
+            for row in inventory.get("sccm", [])
+        ],
+    )
+    _write_text(
+        path("llm.tsv"),
+        ["kind	severity	src	dst	service	host	path	model	auth	detail"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['service'] or '-'}	"
+            f"{row['host'] or '-'}	{row['path'] or '-'}	{row['model'] or '-'}	"
+            f"{row['auth']}	{row['detail']}"
+            for row in inventory.get("llm", [])
         ],
     )
 

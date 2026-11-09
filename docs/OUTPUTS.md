@@ -80,6 +80,8 @@ Rules an agent must follow when consuming it:
 | `adcs.tsv` | enrollment/PKINIT, host, URI, principal | ADCS abuse review |
 | `ipv6.tsv` | DHCPv6/RA DNS, ADIDNS updates | rogue DNS / takeover |
 | `db-creds.tsv` | protocol, src/dst, user, secret/response | database access |
+| `sccm.tsv` | MP/DP/site share, host, URI, auth | SCCM relay target review |
+| `llm.tsv` | service, host, path, model, auth, MCP detail | AI infrastructure inventory |
 | `files.tsv` | sha256, size, type, protocol, src, dst, name, path | index of carved objects |
 | `files/` | the carved objects themselves | **client data**, local only |
 | `bloodhound/users.json`, `computers.json` | SharpHound Legacy JSON built from observed users/hosts/sessions | import as leads (no SIDs/ACLs) |

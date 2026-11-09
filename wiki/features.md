@@ -12,7 +12,8 @@
 | AD | SMB share/file names, printer shares, relay candidates (SMB signing flags + NTLM over SMB/LDAP/HTTP) |
 | Kerberos attacks | Kerberoasting (hashcat 13100/19600/19700), ASRepCatcher-compatible ARP/relay pattern, AS-REP roastable accounts |
 | Secrets | HTTP bearer/JWT/Vault/GitLab/GitHub/AWS tokens (fingerprinted in exports), database auth material |
-| AD exposure | RPC coercion attempts, ADCS enrollment/PKINIT, relay candidates |
+| AD exposure | RPC coercion attempts, ADCS enrollment/PKINIT, SCCM management traffic, relay candidates |
+| AI infrastructure | LLM endpoints/API usage, unauthenticated inference, MCP tool calls, vector DBs |
 | Network takeover | DHCPv6/RA rogue DNS, ADIDNS dynamic updates |
 | Clear text | HTTP/FTP file objects carved with sha256, HTTP WSUS endpoints |
 | Weakness | quick wins: SMBv1, SMB signing, LDAP signing, SNMPv1/v2, SSLv2/v3, TLS1.0, LLMNR/NBT-NS/mDNS, cleartext protocols |
@@ -24,7 +25,7 @@
 `relay-targets.txt`, `relays.tsv`, `smb-shares.txt`, `smb-files.txt`,
 `wsus.txt`, `nac.txt`, `dns.txt`, `asrepcatcher.txt`, `kerberoast-hashes.txt`,
 `tokens.tsv`, `coercions.tsv`, `adcs.tsv`, `ipv6.tsv`, `db-creds.tsv`,
-`files.tsv` + `files/`, `bloodhound/`, `summary.json`.
+`sccm.tsv`, `llm.tsv`, `files.tsv` + `files/`, `bloodhound/`, `summary.json`.
 
 ## Agent feed
 
