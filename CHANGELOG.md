@@ -1,3 +1,12 @@
+# PufferRelay 1.1.2 — 2026-11-09
+
+Packaging fix:
+
+- The wheel now includes every subpackage (`database`, `protocols`, `utils`,
+  `pcap_processing`) and ships `catalog_data.yaml`, so `--detections` works in
+  an installed package. 1.1.1 was uploaded before this fix; use 1.1.2.
+- `requires-python` is >=3.10, matching the tested interpreters.
+
 # PufferRelay 1.1.1 — 2026-11-09
 
 Coverage completion after 1.1.0:

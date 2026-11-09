@@ -1,0 +1,619 @@
+# PufferRelay detection catalog — source of truth for the wiki.
+# One entry per detection handler or active mode. See wiki/intake.md.
+# Fields: id, class, handler, mode, when, detects, proves, limits, fields,
+#         output, severity, next, references, status
+
+- id: det.ldap
+  class: credentials
+  handler: ldap
+  mode: passive
+  when: "the capture contains an LDAP bindRequest"
+  detects: "the bind identity (usually a DN) and a simple-bind password"
+  proves: "a simple LDAP bind occurred; the password when the simple mechanism was used"
+  limits: "SASL binds expose no password; signing state is not in the packet"
+  fields: "ldap.name, ldap.simple"
+  output: "credentials.csv; users.txt; leads CRED-*"
+  severity: critical
+  next: "reuse the bind against LDAP, and check signing separately with relays/coercion"
+  references: "https://www.thehacker.recipes/ad/recon/ldap"
+  status: implemented
+
+- id: det.http
+  class: credentials
+  handler: http
+  mode: passive
+  when: "HTTP requests are present"
+  detects: "Basic-auth credentials, POST form content, URLs and hosts"
+  proves: "cleartext credentials or form data traversed the wire"
+  limits: "TLS is opaque; NTLM/SSO authentication is handled by the NTLM handler"
+  fields: "http.authorization, http.request.uri, http.file_data"
+  output: "credentials.csv, hosts.tsv, leads CRED-*"
+  severity: critical
+  next: "replay Basic auth against the service, then review the form endpoints"
+  references: "https://www.thehacker.recipes/web/"
+  status: implemented
+
+- id: det.ftp
+  class: credentials
+  handler: ftp
+  mode: passive
+  when: "FTP control traffic is present"
+  detects: "USER/PASS command pairs"
+  proves: "cleartext FTP credentials were sent"
+  limits: "FTPS is opaque; binary payloads are not part of the credential row"
+  fields: "ftp.request.command, ftp.request.arg"
+  output: "credentials.csv; leads CRED-*"
+  severity: critical
+  next: "log in to the FTP service and list shares/data (scope-gated)"
+  references: ""
+  status: implemented
+
+- id: det.telnet
+  class: credentials
+  handler: telnet
+  mode: passive
+  when: "Telnet negotiation or data is present"
+  detects: "login/password text in the stream (heuristic)"
+  proves: "cleartext interactive authentication is likely"
+  limits: "heuristic; a prompt without a completed login is not a credential"
+  fields: "telnet.data"
+  output: "credentials.csv; leads CRED-*"
+  severity: high
+  next: "verify the pair in the surrounding stream before reuse"
+  references: ""
+  status: implemented
+
+- id: det.smtp
+  class: credentials
+  handler: smtp
+  mode: passive
+  when: "SMTP authentication is present"
+  detects: "username and password fields"
+  proves: "mailbox credentials were sent"
+  limits: "TLS submission is opaque; OAuth flows expose no password"
+  fields: "smtp.auth.username, smtp.auth.password"
+  output: "credentials.csv; leads CRED-*"
+  severity: critical
+  next: "test the mailbox credentials; respect lockout policy"
+  references: ""
+  status: implemented
+
+- id: det.imap
+  class: credentials
+  handler: imap
+  mode: passive
+  when: "IMAP LOGIN or AUTHENTICATE is present"
+  detects: "the identity and, for LOGIN, the password parsed from the command line"
+  proves: "mailbox credentials were sent"
+  limits: "tshark truncates imap.request.password; AUTHENTICATE may expose only the identity"
+  fields: "tcp.payload (LOGIN line), imap.request.command"
+  output: "credentials.csv; leads CRED-*"
+  severity: critical
+  next: "test the mailbox credentials; check for AUTHENTICATE-only identities"
+  references: ""
+  status: implemented
+
+- id: det.pop3
+  class: credentials
+  handler: pop3
+  mode: passive
+  when: "POP3 USER/PASS or APOP is present"
+  detects: "USER/PASS pairs and the APOP identity"
+  proves: "mailbox credentials were sent"
+  limits: "STLS is opaque; APOP exposes a digest, not the password"
+  fields: "pop3.request.command, pop3.request.arg"
+  output: "credentials.csv; leads CRED-*"
+  severity: critical
+  next: "test the credentials; APOP digests need offline cracking"
+  references: ""
+  status: implemented
+
+- id: det.ntlm
+  class: hashes
+  handler: ntlm
+  mode: passive
+  when: "NTLMSSP messages or HTTP NTLM headers are present"
+  detects: "NetNTLMv1/v2 challenge-response pairs (hashcat 5500/5600)"
+  proves: "an NTLM authentication exchange was captured and can be cracked offline"
+  limits: "relay feasibility depends on the destination's signing policy (see relays)"
+  fields: "tcp.payload, http.authorization, http.www_authenticate"
+  output: "ntlm-hashes.txt; leads HASH-*"
+  severity: high
+  next: "crack offline; correlate the user with relay-targets.txt"
+  references: "https://www.thehacker.recipes/ad/movement/ntlm/"
+  status: implemented
+
+- id: det.netbios
+  class: inventory
+  handler: netbios
+  mode: passive
+  when: "NBNS name/registration frames are present"
+  detects: "workstation, domain/browser and service names plus MAC addresses"
+  proves: "the host was advertising these NetBIOS names on the segment"
+  limits: "names are self-asserted; no proof the host still exists"
+  fields: "nbns.name, nbns.type, arp.src.hw_mac"
+  output: "hosts.tsv; leads QW/NETBIOS when anomalous"
+  severity: low
+  next: "attach names to IPs and use them for targeting and reporting"
+  references: ""
+  status: implemented
+
+- id: det.snmp
+  class: credentials
+  handler: snmp
+  mode: passive
+  when: "SNMP v1/v2c traffic is present"
+  detects: "community strings and version"
+  proves: "a community string was sent in clear text"
+  limits: "SNMPv3 auth/priv is not parsed"
+  fields: "snmp.community, snmp.version"
+  output: "credentials.csv; quick win SNMPv1/SNMPv2"
+  severity: high
+  next: "query the device with the community (scope-gated); check write access"
+  references: ""
+  status: implemented
+
+- id: det.kerberos
+  class: kerberos
+  handler: kerberos
+  mode: passive
+  when: "AS-REQ/AS-REP exchanges are present"
+  detects: "accounts whose AS-REP was returned without pre-authentication (hashcat 18200)"
+  proves: "the KDC returned a crackable AS-REP for that account"
+  limits: "an encrypted AS-REP is not a cracked password; Kerberoasting is separate"
+  fields: "kerberos.msg_type, kerberos.CNameString, kerberos.realm, kerberos.etype, kerberos.padata_type"
+  output: "asrep-hashes.txt; leads ASREP-*"
+  severity: critical
+  next: "crack offline, then test the password (scope-gated)"
+  references: "https://www.thehacker.recipes/ad/movement/kerberos/roasting/"
+  status: implemented
+
+- id: det.relays
+  class: ad
+  handler: relays
+  mode: passive
+  when: "NTLM authentication crosses SMB, LDAP or HTTP and the destination signing state is visible"
+  detects: "relay candidates with source, destination, protocol, user and signing-required flag"
+  proves: "an NTLM exchange occurred and the destination may accept a relayed authentication"
+  limits: "the capture does not prove a relay was attempted or will succeed"
+  fields: "smb2.sec_mode.sign_required, NTLM fields, protocol ports"
+  output: "relay-targets.txt, relays.tsv; leads RELAY-*"
+  severity: high
+  next: "confirm signing on the destination; use coercion findings for a chain"
+  references: "https://www.thehacker.recipes/ad/movement/ntlm/relay"
+  status: implemented
+
+- id: det.smb
+  class: ad
+  handler: smb
+  mode: passive
+  when: "SMB tree connects, creates or reads are present"
+  detects: "shares, file names, printer shares and SMB-signing state"
+  proves: "the client accessed these shares/files; signing was or was not required"
+  limits: "file names come from CREATE/READ frames; content needs smbobjects"
+  fields: "smb2.tree, smb2.filename, smb2.sec_mode.sign_required"
+  output: "smb-shares.txt, smb-files.txt; leads SMB-*, SMBFILE-*"
+  severity: medium
+  next: "list the shares from the operator host; carve content with smbobjects"
+  references: "https://www.thehacker.recipes/ad/movement/smb/"
+  status: implemented
+
+- id: det.files
+  class: files
+  handler: files
+  mode: passive
+  when: "HTTP responses or FTP-DATA carry file objects"
+  detects: "object name, type, size and sha256; writes the bytes to files/"
+  proves: "the object crossed the wire and can be inspected locally"
+  limits: "1 MiB/object, 16 MiB/capture; TLS and segmented SMB are opaque"
+  fields: "http.file_data, ftp.data, http.content_type"
+  output: "files.tsv, files/; leads FILE-*"
+  severity: medium
+  next: "inspect interesting objects locally; never upload them"
+  references: "https://github.com/vikwin/pcapfex"
+  status: implemented
+
+- id: det.nac
+  class: network
+  handler: nac
+  mode: passive
+  when: "EAPOL/EAP or RADIUS frames are present"
+  detects: "802.1X/MAB identities, authenticator and method"
+  proves: "port authentication is in use and which identities authenticate"
+  limits: "no keys; spoof proposals are text-only and appear in active-commands.md"
+  fields: "eapol, eap, radius User-Name"
+  output: "nac.txt; leads NAC-*; --commands adds text-only 802.1X/MAB proposals"
+  severity: low
+  next: "decide whether the port is defended before any active test"
+  references: ""
+  status: implemented
+
+- id: det.wsus
+  class: network
+  handler: wsus
+  mode: passive
+  when: "HTTP requests look like Windows Update/WSUS"
+  detects: "WSUS endpoints, hosts and indicators"
+  proves: "the client contacted update infrastructure"
+  limits: "approval state and package integrity are not visible"
+  fields: "http.host, http.request.uri, http.user_agent"
+  output: "wsus.txt; leads WSUS-*"
+  severity: medium
+  next: "check whether the WSUS server itself is trustworthy and patched"
+  references: ""
+  status: implemented
+
+- id: det.services
+  class: inventory
+  handler: services
+  mode: passive
+  when: "TCP SYN/acknowledgement traffic is present"
+  detects: "observed TCP services per IP (port + resolved service name)"
+  proves: "the service was reachable at capture time"
+  limits: "only observed ports; no banner or version unless another handler sees it"
+  fields: "tcp.flags, tcp.dstport"
+  output: "hosts.tsv, nmap-targets.txt"
+  severity: low
+  next: "use nmap-targets.txt for verification (ACTIVE, scope-gated)"
+  references: ""
+  status: implemented
+
+- id: det.ips
+  class: inventory
+  handler: ips
+  mode: passive
+  when: "IP traffic is present"
+  detects: "IP inventory grouped by /24"
+  proves: "the address was seen on the segment"
+  limits: "a capture from a tap may include unrelated hosts"
+  fields: "ip.src, ip.dst"
+  output: "ips.txt, subnets.txt"
+  severity: low
+  next: "scope the engagement around the observed subnets"
+  references: ""
+  status: implemented
+
+- id: det.dns
+  class: network
+  handler: dns
+  mode: passive
+  when: "DNS queries/answers are present"
+  detects: "query name, record type, A/AAAA/PTR answer; attaches names to host IPs"
+  proves: "the name was resolved to that address during the capture"
+  limits: "one answer per row when a response carries several records; DoH/DoT is opaque"
+  fields: "dns.qry.name, dns.qry.type, dns.flags.response, dns.a, dns.aaaa"
+  output: "dns.txt; hostnames in hosts.tsv"
+  severity: low
+  next: "use the name map for targeting and reporting; check ADIDNS separately"
+  references: "https://www.thehacker.recipes/ad/recon/dns"
+  status: implemented
+
+- id: det.asrepcatcher
+  class: ad
+  handler: asrepcatcher
+  mode: passive
+  when: "Kerberos and ARP frames can be correlated"
+  detects: "relayed AS-REQ from two sources, an AS-REP diverted to a host that did not ask, one IP announced by two MACs, pre-auth-less bursts"
+  proves: "the traffic shape matches ASRepCatcher; ARP spoofing plus a Kerberos signal is critical"
+  limits: "heuristic; a partial capture cannot correlate a reply; not proof of intent"
+  fields: "kerberos.msg_type, kerberos.CNameString, kerberos.padata_type, arp.opcode, arp.src.proto_ipv4, arp.src.hw_mac"
+  output: "asrepcatcher.txt; leads ASREPCATCHER-*; console panel with the repo link"
+  severity: critical
+  next: "review the evidence; the lead links https://github.com/Yaxxine7/ASRepCatcher"
+  references: "https://github.com/Yaxxine7/ASRepCatcher"
+  status: partial
+
+- id: det.kerberoast
+  class: hashes
+  handler: kerberoast
+  mode: passive
+  when: "TGS-REQ/TGS-REP exchanges are present"
+  detects: "TGS-REP service tickets; walks the KDC-REP DER to the ticket enc-part and formats hashcat 13100/19600/19700; reports bursts of five SPNs as candidates"
+  proves: "a service ticket encrypted with the service account hash was issued"
+  limits: "fragmented/unreassembled DER yields a candidate without a hash; SPN-to-account resolution needs directory data"
+  fields: "kerberos.msg_type, kerberos.SNameString, kerberos.etype, tcp.reassembled.data, udp.payload"
+  output: "kerberoast-hashes.txt; leads KERBEROAST-*, KERBEROASTCAND-*"
+  severity: critical
+  next: "crack offline with the matching hashcat mode, then test the service account"
+  references: "https://www.thehacker.recipes/ad/movement/kerberos/roasting/targeted-kerberoasting"
+  status: partial
+
+- id: det.httptokens
+  class: credentials
+  handler: httptokens
+  mode: passive
+  when: "HTTP requests/responses carry authentication headers, cookies or token-shaped strings"
+  detects: "Bearer, Vault, GitLab, API-key, session cookies and JWT/GitHub/AWS/Slack/Stripe tokens; decodes JWT claims"
+  proves: "a reusable secret was sent over HTTP"
+  limits: "TLS is opaque; headers split across TCP segments may be missed; JWT signature is not verified"
+  fields: "http.authorization, http.cookie, tcp.payload, http.file_data"
+  output: "tokens.tsv (fingerprints); leads TOKEN-*"
+  severity: critical
+  next: "replay the token (scope-gated); raw values stay in the local database only"
+  references: "https://blog.quarkslab.com/a-story-about-confluence-and-tokens.html"
+  status: implemented
+
+- id: det.coercion
+  class: ad
+  handler: coercion
+  mode: passive
+  when: "DCE/RPC binds/requests to EFSRPC, RPRN, DFSNM or FSRVP are present"
+  detects: "the coercion interface/pipe and the UNC path from the call data"
+  proves: "a victim was told to authenticate to a host (the first half of a relay chain)"
+  limits: "encrypted RPC is opaque; a bind or pipe without a UNC path is normal traffic and is ignored"
+  fields: "dcerpc.cn_bind_to_uuid, dcerpc.opnum, smb2.filename, tcp.reassembled.data"
+  output: "coercions.tsv; leads COERCE-*"
+  severity: high
+  next: "look for the matching NTLM exchange to the UNC host and review relay-targets.txt"
+  references: "https://www.thehacker.recipes/ad/movement/mitm-and-coerced-authentications/rpc-coercions/"
+  status: partial
+
+- id: det.adcs
+  class: ad
+  handler: adcs
+  mode: passive
+  when: "HTTP /certsrv enrollment, Kerberos PKINIT or MS-WCCE DCOM enrollment is present"
+  detects: "HTTP enrollment (NTLM flagged high), PKINIT AS-REQ, and DCOM binds to ICertRequestD/D2/ICertAdminD2"
+  proves: "certificate enrollment or certificate logon was observed"
+  limits: "template attributes are usually not visible; enrollment success is not confirmed"
+  fields: "http.request.uri, http.authorization, kerberos.padata_type, dcerpc.cn_bind_to_uuid"
+  output: "adcs.tsv; leads ADCS-*"
+  severity: high
+  next: "review the CA/template and whether the enrolling host should be able to do this"
+  references: "https://www.thehacker.recipes/ad/movement/adcs/"
+  status: partial
+
+- id: det.ipv6
+  class: network
+  handler: ipv6
+  mode: passive
+  when: "DHCPv6, ICMPv6 router advertisements or DNS UPDATE are present"
+  detects: "offered DNS servers, RDNSS/DNSSL, and ADIDNS dynamic updates; one host doing both is critical"
+  proves: "a host is offering DNS via IPv6 and/or updating AD-integrated DNS"
+  limits: "no baseline of the legitimate resolver; confirm before calling it rogue"
+  fields: "dhcpv6.msgtype, dhcpv6.dns_server, icmpv6.type, icmpv6.opt.rdnss, dns.flags.opcode"
+  output: "ipv6.tsv; leads IPV6-*"
+  severity: critical
+  next: "identify the offering host and compare it with the known resolver"
+  references: "https://www.thehacker.recipes/ad/movement/mitm-and-coerced-authentications/dhcpv6-spoofing"
+  status: implemented
+
+- id: det.dbcreds
+  class: credentials
+  handler: dbcreds
+  mode: passive
+  when: "Redis, MySQL or PostgreSQL traffic is present"
+  detects: "Redis AUTH clear text, MySQL login salt/response as a MySQL CRAM hashcat 11200 line, PostgreSQL startup parameters plus clear-text or MD5 (hashcat 12) auth, MSSQL SQL-auth username/password"
+  proves: "reusable database material or a crackable authentication response was sent"
+  limits: "SCRAM exchanges expose only the mechanism; MSSQL Windows auth stays with the NTLM handler"
+  fields: "tcp.payload, mysql.user, mysql.passwd, mysql.salt, pgsql.parameter_name, pgsql.password, pgsql.authtype, pgsql.salt, tds.login.username, tds.login.password"
+  output: "db-creds.tsv; leads DB-*"
+  severity: critical
+  next: "reuse clear-text credentials (scope-gated) or crack the response offline"
+  references: "https://www.thehacker.recipes/infra/protocols/mssql"
+  status: partial
+
+- id: det.smbobjects
+  class: files
+  handler: smbobjects
+  mode: passive
+  when: "SMB traffic carries file objects that tshark can reassemble"
+  detects: "file content, name, type and sha256 exported through the captured-files pipeline"
+  proves: "the object crossed SMB and can be inspected locally"
+  limits: "8 MiB/object, 16 MiB/capture; SMB3 encryption and missing reassembly yield nothing"
+  fields: "tshark --export-objects smb"
+  output: "files.tsv, files/"
+  severity: medium
+  next: "inspect interesting objects locally; keep the output on the engagement machine"
+  references: "https://www.thehacker.recipes/ad/movement/smb/"
+  status: implemented
+
+- id: det.sccm
+  class: ad
+  handler: sccm
+  mode: passive
+  when: "SCCM management/distribution HTTP, SMS shares or site-server admin-share traffic is present"
+  detects: "management point, distribution point, site/package shares, and client-push SMB from an observed MP to ADMIN$/C$"
+  proves: "SCCM management traffic was observed; NTLM to an MP or a push to an admin share is a relay/lateral path"
+  limits: "SMS Provider DCOM and policy objects are not parsed"
+  fields: "http.request.uri, http.host, http.authorization, smb2.tree"
+  output: "sccm.tsv; leads SCCM-*"
+  severity: high
+  next: "review the endpoint and authentication; correlate with relay findings"
+  references: "https://www.thehacker.recipes/ad/movement/sccm-mecm/"
+  status: partial
+
+- id: det.llm
+  class: ai
+  handler: llm
+  mode: passive
+  when: "HTTP traffic targets an LLM service, MCP endpoint or vector database"
+  detects: "service, endpoint, model, auth-header presence, MCP method and tool names"
+  proves: "which AI service is in use and whether it was reached without authentication"
+  limits: "TLS is opaque; ambiguous ports are recognised only by path markers; prompts are not exported"
+  fields: "http.host, http.request.uri, tcp.dstport, tcp.payload, http.file_data"
+  output: "llm.tsv; leads LLM-*"
+  severity: critical
+  next: "review exposure; an unauthenticated inference endpoint is the critical case"
+  references: "https://blog.quarkslab.com/agentic-ai-the-confused-deputy-problem.html"
+  status: partial
+
+- id: det.kerberosdepth
+  class: kerberos
+  handler: kerberosdepth
+  mode: passive
+  when: "Kerberos AS/TGS exchanges carry delegation or PKINIT padata"
+  detects: "S4U/PA-FOR-USER requests, additional-ticket S4U2Proxy, delegation ticket flags, PKINIT followed by a user-to-user request (UnPAC chain)"
+  proves: "an account can delegate, or a certificate logon was followed by a user-to-user request that enables UnPAC-the-hash"
+  limits: "heuristic from flags/padata; it does not prove the delegation succeeds; hashes are not extracted"
+  fields: "kerberos.padata_type, kerberos.additional_tickets, kerberos.TicketFlags.*"
+  output: "kerberos-signals.tsv; leads KERB-*"
+  severity: high
+  next: "check the account's delegation rights before using the path"
+  references: "https://www.thehacker.recipes/ad/movement/kerberos/delegations/"
+  status: partial
+
+- id: det.ldapdir
+  class: ad
+  handler: ldapdir
+  mode: passive
+  when: "LDAP search results contain sAMAccountName, objectSID or servicePrincipalName"
+  detects: "SPN-to-account mapping and objectSID when the directory response is captured"
+  proves: "the service principal belongs to that account in the observed directory data"
+  limits: "attribute/value pairing is positional and can be confused by commas or split entries"
+  fields: "ldap.AttributeDescription, ldap.AttributeValue"
+  output: "ldap-spns.tsv; leads SPN-*; objectSID upgrades BloodHound identifiers"
+  severity: medium
+  next: "join the SPN with the Kerberoast hash/lead for the same service"
+  references: "https://www.thehacker.recipes/ad/recon/ldap"
+  status: partial
+
+- id: det.rdp
+  class: credentials
+  handler: rdp
+  mode: passive
+  when: "RDP negotiation or client data is present"
+  detects: "requested protocols, negotiation type, and a DOMAIN\\user or user@domain from client data/routing cookie"
+  proves: "RDP was offered/used and, when present, the account that connected"
+  limits: "CredSSP passwords are encrypted; identity extraction depends on client data being visible"
+  fields: "rdp.neg_type, rdp.negReq.requestedProtocols, rdp.clientData, rdp.rt_cookie"
+  output: "rdp.tsv; leads RDP-*"
+  severity: medium
+  next: "review the host exposure and the account for interactive access"
+  references: ""
+  status: implemented
+
+- id: det.cloudapi
+  class: cloud
+  handler: cloudapi
+  mode: passive
+  when: "Docker, Kubernetes, kubelet, etcd, Consul, Vault or Veeam ports carry HTTP"
+  detects: "sensitive API paths requested with or without an auth header"
+  proves: "an infrastructure API was reachable; without auth it is a direct control-plane path"
+  limits: "TLS is opaque; only the request side is seen, and a 401 response cannot be distinguished from success"
+  fields: "tcp.dstport, http.request.uri, http.host, tcp.payload"
+  output: "cloud-apis.tsv; leads CLOUD-*"
+  severity: critical
+  next: "verify the endpoint with a read-only request (ACTIVE; scope-gated)"
+  references: "https://www.thehacker.recipes/infra/protocols/"
+  status: partial
+
+- id: det.voip
+  class: network
+  handler: voip
+  mode: passive
+  when: "SIP or Cisco Skinny/SCCP signalling is present"
+  detects: "SIP methods (REGISTER/INVITE/MESSAGE), caller/callee, Call-ID, digest auth presence and digest fields; Skinny call party metadata"
+  proves: "call signalling was visible in clear text and which endpoints registered/called"
+  limits: "media (RTP) is not decoded; TLS/SIPS is opaque; digest response is fingerprinted, not cracked"
+  fields: "sip.Method, sip.from.user, sip.to.user, sip.Call-ID, sip.Authorization, skinny.CallingPartyNumber"
+  output: "voip.tsv; leads VOIP-*"
+  severity: medium
+  next: "review the registrar/PBX exposure and the extension map"
+  references: ""
+  status: implemented
+
+- id: det.fingerprints
+  class: network
+  handler: fingerprints
+  mode: passive
+  when: "SSH, TLS, VNC or TFTP traffic is present"
+  detects: "SSH banners, TLS SNI and version, VNC protocol/security type, TFTP file names, SMB3 encryption capability/session"
+  proves: "these services were exposed and which versions/encryption they offered"
+  limits: "banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises; SMB3 encryption makes content opaque"
+  fields: "ssh.protocol, tls.handshake.extensions_server_name, vnc.server_proto_ver, vnc.server_security_type, tftp.source_file, smb2.ses_flags.encrypt"
+  output: "fingerprints.tsv; leads FP-*"
+  severity: medium
+  next: "prioritise no-auth VNC, cleartext TFTP and old SSH banners for verification"
+  references: ""
+  status: implemented
+
+- id: det.ldapadcs
+  class: ad
+  handler: ldapadcs
+  mode: passive
+  when: "LDAP search results contain pKIEnrollmentService or pKICertificateTemplate objects"
+  detects: "CA name/DNS host/published templates, and template SAN/enrollment flags"
+  proves: "the AD-integrated CA and templates observed in the directory response; SAN flag is an ESC1 indicator"
+  limits: "attribute/value pairing is positional; template ACLs and effective rights are not visible"
+  fields: "ldap.AttributeDescription, ldap.AttributeValue"
+  output: "ldap-adcs.tsv; leads ADCSDIR-*"
+  severity: high
+  next: "review template ACLs and enrollment rights before testing"
+  references: "https://www.thehacker.recipes/ad/movement/adcs/certificate-templates"
+  status: partial
+
+- id: det.quickwins
+  class: weakness
+  handler: quickwins
+  mode: passive
+  when: "-q is used, or -f is combined with -q"
+  detects: "SMBv1, missing SMB/LDAP signing, SNMPv1/v2, SSLv2/v3, TLS1.0, LLMNR/NBT-NS/mDNS, cleartext protocols"
+  proves: "a weak protocol or configuration was observed on the wire"
+  limits: "presence is not exploitability; signing may be enforced elsewhere"
+  fields: "one tshark pass over the quick-win fields"
+  output: "quick_wins table; leads QW-*"
+  severity: varies
+  next: "confirm the weak setting from the operator host (ACTIVE, scope-gated)"
+  references: "https://www.thehacker.recipes/ad/movement/mitm-and-coerced-authentications/llmnr-nbtns-mdns-spoofing"
+  status: implemented
+
+- id: active.live
+  class: active
+  handler: live
+  mode: active
+  when: "no capture exists yet and you can capture on an authorized interface"
+  detects: "whatever the mandatory BPF filter matches, analysed like a pcap"
+  proves: "nothing by itself; the same passive handlers do the work"
+  limits: "requires --live, --bpf and --duration; red warning and authorization; temp file deleted unless kept"
+  fields: "n/a"
+  output: "same as -f; --keep-live-capture keeps the temporary pcap"
+  severity: varies
+  next: "confirm written scope before running; start with a narrow filter"
+  references: ""
+  status: implemented
+
+- id: active.proxy
+  class: active
+  handler: proxy
+  mode: active
+  when: "you need to observe one TCP target through a local relay"
+  detects: "both directions of the relayed stream, recorded as JSONL (base64 chunks)"
+  proves: "the bytes that crossed the relay; not a pcap"
+  limits: "one target, bounded duration, explicit warning and authorization"
+  fields: "n/a"
+  output: "proxy-recording.jsonl"
+  severity: varies
+  next: "confirm scope; prefer a passive capture when one is available"
+  references: ""
+  status: implemented
+
+- id: active.commands
+  class: active
+  handler: commands
+  mode: active
+  when: "the inventory suggests an ARP/relay path and you want reviewable commands"
+  detects: "nothing; it generates text (ARP spoof, ettercap, relay) for relay-relevant hosts"
+  proves: "the commands are suggestions, not executed actions"
+  limits: "text only; every line is ACTIVE and includes cleanup"
+  fields: "n/a"
+  output: "active-commands.md"
+  severity: varies
+  next: "review scope and cleanup before running anything"
+  references: "https://www.thehacker.recipes/ad/movement/mitm-and-coerced-authentications/arp-poisoning"
+  status: implemented
+
+- id: active.serveme
+  class: active
+  handler: serveme
+  mode: active
+  when: "you want a next-step command per host or finding"
+  detects: "nothing; it generates text from the passive inventory"
+  proves: "suggestions derived from the capture"
+  limits: "text only; ACTIVE lines are marked"
+  fields: "n/a"
+  output: "serveme.md"
+  severity: varies
+  next: "review each command and its scope warning"
+  references: ""
+  status: implemented

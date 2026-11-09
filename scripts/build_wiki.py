@@ -18,6 +18,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "wiki", "detections.yaml")
 DETECTIONS = os.path.join(ROOT, "wiki", "DETECTIONS.md")
 CHEATSHEET = os.path.join(ROOT, "wiki", "CHEATSHEET.md")
+PACKAGED_CATALOG = os.path.join(ROOT, "PufferRelay", "catalog_data.yaml")
 
 REQUIRED = [
     "id", "class", "handler", "mode", "when", "detects", "proves", "limits",
@@ -256,6 +257,10 @@ def main(argv=None):
     errors = []
     errors += write_or_check(DETECTIONS, render_detections(entries), check)
     errors += write_or_check(CHEATSHEET, render_cheatsheet(entries), check)
+    # The installed CLI needs the catalog; ship a copy inside the package.
+    with open(SRC, encoding="utf-8") as handle:
+        source_text = handle.read()
+    errors += write_or_check(PACKAGED_CATALOG, source_text, check)
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)

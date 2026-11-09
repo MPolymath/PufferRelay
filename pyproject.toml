@@ -2,15 +2,18 @@
 requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages = ["PufferRelay"]
+[tool.setuptools.packages.find]
+include = ["PufferRelay*"]
+
+[tool.setuptools.package-data]
+PufferRelay = ["catalog_data.yaml"]
 
 [project]
 name = "pufferrelay"
-version = "1.1.1"
+version = "1.1.2"
 description = "A network protocol analyzer and credential extractor"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = "GPL-3.0-or-later"
 authors = [
     {name = "Massamba DIOUF", email = "your.email@example.com"}
@@ -19,10 +22,10 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: System Administrators",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Security",
     "Topic :: System :: Networking :: Monitoring",
 ]

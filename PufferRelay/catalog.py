@@ -1,11 +1,18 @@
-"""Read the detection catalog (wiki/detections.yaml) for the CLI (step 8)."""
+"""Read the detection catalog for the CLI (step 8).
+
+Development uses the packaged copy (regenerated from wiki/detections.yaml by
+scripts/build_wiki.py), so the installed CLI works without the repository.
+Set PUFFERRELAY_CATALOG to point at another YAML file.
+"""
 
 from __future__ import annotations
 
 import os
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CATALOG = os.path.join(ROOT, "wiki", "detections.yaml")
+PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
+CATALOG = os.environ.get(
+    "PUFFERRELAY_CATALOG", os.path.join(PACKAGE_DIR, "catalog_data.yaml")
+)
 
 
 def parse(path=CATALOG):
