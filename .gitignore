@@ -9,3 +9,9 @@ out/
 pufferrelay-out/
 .venv/
 venv/
+*.pcap
+*.pcapng
+*.cap
+*.pcap.gz
+captures/
+extracted_data.db

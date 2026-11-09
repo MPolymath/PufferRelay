@@ -35,7 +35,12 @@ mirror) and now wants to know *what can I attack next, with what command*.
    protocol fields) so the report can say where it came from.
 5. **No silent failures.** Parsing errors are logged with protocol + packet
    context; a handler that finds nothing says so explicitly.
-6. **Schema is versioned.** `PufferRelay/database/db_version.py` owns the
+6. **Capture confidentiality.** Client `.pcap`/`.pcapng` files and anything
+   derived from them (databases, exports, hashes, credentials, reports) never
+   leave the machine and are never uploaded, pasted into online services or AI
+   tools, or committed. Test locally with `scripts/local_smoke.py`, which prints
+   aggregate counts only. Full rules: `docs/PRIVACY.md`.
+7. **Schema is versioned.** `PufferRelay/database/db_version.py` owns the
    version. Any table/column change bumps it and ships a migration path or a
    clear "delete the old DB" message.
 
