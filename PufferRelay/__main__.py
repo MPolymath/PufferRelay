@@ -113,6 +113,14 @@ def _print_machine_output(args, inventory, leads):
 
 
 def main():
+    # Windows consoles/pipes default to a legacy code page; Rich output and
+    # UTF-8 findings must not crash when stdout is redirected.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     parser = argparse.ArgumentParser(
         description="PufferRelay - passive network capture analyzer"
     )
