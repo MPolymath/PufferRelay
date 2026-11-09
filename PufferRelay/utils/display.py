@@ -3,9 +3,9 @@ from PufferRelay.core_imports import os
 from PufferRelay.core_imports import textwrap
 from PufferRelay.core_imports import shutil
 from PufferRelay.core_imports import sqlite3
-from PufferRelay.core_imports import rich
-from PufferRelay.core_imports import rich.table
-from PufferRelay.core_imports import rich.console
+from PufferRelay.core_imports import Table
+from PufferRelay.core_imports import Console
+from PufferRelay.core_imports import Text
 from PufferRelay.core_imports import re
 
 def highlight_sensitive_data(text):

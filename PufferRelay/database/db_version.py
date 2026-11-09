@@ -27,7 +27,64 @@ from PufferRelay.core_imports import (
 from PufferRelay.config import DB_NAME
 
 # Current schema version - increment this when making schema changes
-CURRENT_SCHEMA_VERSION = 2
+CURRENT_SCHEMA_VERSION = 3
+
+def migrate_database(conn):
+    """Bring an existing database up to CURRENT_SCHEMA_VERSION.
+
+    PRAGMA user_version is the source of truth; the legacy ``schema_version``
+    table (if present) is kept in sync for older releases.
+
+    v3 repairs ``netbios_requests``: older databases used columns that the
+    insert path never matched, so NetBIOS findings were silently lost. The
+    table is rebuilt (there is no useful data to preserve) and
+    ``observed_services`` is added by create_database().
+
+    Returns False when the database is newer than this tool.
+    """
+    try:
+        cursor = conn.cursor()
+        legacy = 0
+        try:
+            cursor.execute("SELECT version FROM schema_version")
+            row = cursor.fetchone()
+            if row and str(row[0]).strip().isdigit():
+                legacy = int(str(row[0]).strip())
+        except sqlite3.Error:
+            legacy = 0
+
+        cursor.execute("PRAGMA user_version")
+        version = int(cursor.fetchone()[0] or 0)
+        version = max(version, legacy)
+
+        if version > CURRENT_SCHEMA_VERSION:
+            logging.error(
+                "Database schema v%s is newer than this PufferRelay (supports v%s). "
+                "Upgrade PufferRelay or use a fresh database.",
+                version,
+                CURRENT_SCHEMA_VERSION,
+            )
+            return False
+
+        if version < 3:
+            cursor.execute("DROP TABLE IF EXISTS netbios_requests")
+
+        cursor.execute("PRAGMA user_version = %d" % CURRENT_SCHEMA_VERSION)
+        try:
+            cursor.execute("CREATE TABLE IF NOT EXISTS schema_version (version TEXT)")
+            cursor.execute("DELETE FROM schema_version")
+            cursor.execute(
+                "INSERT INTO schema_version (version) VALUES (?)",
+                (str(CURRENT_SCHEMA_VERSION),),
+            )
+        except sqlite3.Error:
+            pass
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        logging.error("Database migration error: %s", e)
+        return False
+
 
 def get_db_schema_version(conn):
     """

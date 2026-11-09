@@ -46,6 +46,27 @@ pufferrelay -f {filename} --log-level DEBUG
 ### ⚡ QUICKWIN
 pufferrelay -q {filename}
 
+#### Parse only what you need (faster on big captures)
+pufferrelay -f {filename} --only ftp,http,ntlm <br>
+pufferrelay -f {filename} --credentials-only <br>
+
+#### Write the export pack + the AI-agent lead briefing
+pufferrelay -f {filename} --dump out <br>
+pufferrelay -q {filename} --dump out <br>
+pufferrelay -r --dump out <br>
+
+The pack contains `ips.txt`, `subnets.txt`, `users.txt`, `hosts.tsv`,
+`nmap-targets.txt`, `nmap-command.txt`, `credentials.csv`, `ntlm-hashes.txt`,
+`summary.json`, and the agent feed: `leads.json` + `leads.md` (every lead with
+its evidence, suggested next actions, and explicit warnings for anything that
+sends traffic). See [docs/OUTPUTS.md](docs/OUTPUTS.md) and
+[docs/PLAN.md](docs/PLAN.md).
+
+#### Query the database
+pufferrelay -r --json <br>
+pufferrelay -r --creds <br>
+pufferrelay -r --inventory <br>
+
 ### Documentation
 The <a href="https://mpolymath.gitbook.io/pufferrelay">Wiki</a> is under construction but will be available soon !
 

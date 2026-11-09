@@ -68,7 +68,8 @@ def setup_logger(log_level=None):
     file_handler.setLevel(logging.DEBUG)
 
     # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Logs go to stderr so stdout stays machine-readable (--json).
+    console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setFormatter(console_formatter)
     console_handler.setLevel(logging.INFO)
 

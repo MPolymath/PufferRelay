@@ -35,12 +35,9 @@ def process_ips(pcap_file):
     capture = None
     try:
         # Open the capture file without any filter to get all packets
-        capture = pyshark.FileCapture(
-            pcap_file,
-            use_json=True,  # Use JSON output for better stability
-            include_raw=True,  # Include raw packet data
-            debug=True  # Enable debug mode
-        )
+        # JSON output is stable; raw data and pyshark debug are not needed
+        # and made big captures slow and noisy (#52, #55).
+        capture = pyshark.FileCapture(pcap_file, use_json=True)
         
         unique_ips = set()
         

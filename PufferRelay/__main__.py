@@ -19,141 +19,231 @@
 #         (c) Laurent Gaffie GNU General Public License v3.0.
 
 import argparse
+import json
 import logging
 import os
 import sys
 import time
 import threading
-import asyncio
+
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich import print as rprint
-from rich.logging import RichHandler
-from PufferRelay.core_imports import pyshark
+
 from PufferRelay.database.db_models import create_database
 from PufferRelay.database.db_queries import (
     get_quick_wins,
     display_quick_wins,
-    update_quick_win,
     fetch_all_data,
-    insert_into_database
+    process_extracted_data,
 )
 from PufferRelay.protocols.quick_wins import analyze_quick_wins
-from PufferRelay.protocols.pop3_handler import process_pop3
 from PufferRelay.logger import setup_logger
 from PufferRelay.utils.loading_animation import show_loading_animation
+from PufferRelay import export
 
-# Suppress asyncio proactor message
-logging.getLogger('asyncio').setLevel(logging.WARNING)
 
 def read_quick_wins_from_db(conn, show_ready_func=None):
-    """
-    Read and display quick wins from the database.
-    
-    Args:
-        conn: Database connection
-        show_ready_func: Function to show the ready banner
-    """
+    """Read and display quick wins from the database."""
     try:
-        # Clear screen first if we're going to show the banner
         if show_ready_func:
-            os.system('cls' if os.name == 'nt' else 'clear')
+            os.system("cls" if os.name == "nt" else "clear")
             show_ready_func(quick_wins=True)
             logging.info("\033[33mQuick Wins Analysis Starting...\033[0m")
-        
-        # Get all quick wins from the database
+
         quick_wins = get_quick_wins(conn)
-        
         if not quick_wins:
             rprint(Panel("[yellow]No quick wins found in the database.[/yellow]"))
             return
-        
-        # Display the quick wins in a table
         display_quick_wins(quick_wins)
-        
     except Exception as e:
         logging.error(f"Error reading quick wins from database: {str(e)}")
         raise
 
+
+def run_exports(conn, out_dir, pcap_name=""):
+    """Write the export pack (files + agent lead briefing)."""
+    try:
+        files = export.write_exports(conn, out_dir, pcap_name=pcap_name)
+    except Exception as e:
+        logging.error(f"Export failed: {str(e)}")
+        raise
+    leads_md = os.path.join(out_dir, "leads.md")
+    rprint(
+        Panel(
+            "\n".join(
+                ["[green]Export pack written:[/green]"]
+                + [f"  {path}" for path in files]
+                + ["", f"[bold]Agent feed:[/bold] {leads_md}"]
+            ),
+            title="Exports",
+            border_style="green",
+        )
+    )
+    return files
+
+
+def _print_machine_output(args, inventory, leads):
+    """stdout only, for pipes and other tools."""
+    if args.json:
+        print(
+            json.dumps(
+                {"inventory": inventory, "leads": leads},
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+    elif args.creds:
+        for cred in inventory["credentials"]:
+            print(
+                f"{cred['protocol']},{cred['source_ip']},"
+                f"{cred['destination_ip']},{cred['username']},"
+                f"{cred['secret']},{cred['context']}"
+            )
+    elif args.inventory:
+        for host in inventory["hosts"]:
+            names = ",".join(host["hostnames"]) or "-"
+            print(f"{host['ip']}\t{names}")
+        for user in inventory["users"]:
+            domain = user["domain"] or "-"
+            print(f"USER\t{user['username']}\t{domain}")
+
+
 def main():
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description='PufferRelay - Network Protocol Analyzer')
-    parser.add_argument('-f', '--file', help='PCAP file to analyze')
-    parser.add_argument('-r', '--read', action='store_true', help='Read from database')
-    parser.add_argument('-q', '--quick-wins', nargs='?', const=True, help='PCAP file to analyze for quick wins (optional with -r)')
-    parser.add_argument('--log-level', choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                      default='INFO', help='Set the logging level')
+    parser = argparse.ArgumentParser(
+        description="PufferRelay - passive network capture analyzer"
+    )
+    parser.add_argument("-f", "--file", help="PCAP file to analyze")
+    parser.add_argument("-r", "--read", action="store_true", help="Read from database")
+    parser.add_argument(
+        "-q",
+        "--quick-wins",
+        nargs="?",
+        const=True,
+        help="PCAP file to analyze for quick wins (optional with -r or -f)",
+    )
+    parser.add_argument(
+        "--only",
+        help="Run only these handlers, comma separated "
+        "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,services,ips)",
+    )
+    parser.add_argument(
+        "--credentials-only",
+        action="store_true",
+        help="Run only handlers that can yield identities or credentials",
+    )
+    parser.add_argument(
+        "--dump",
+        metavar="DIR",
+        help="Write the export pack (inventories, credentials, hashes, nmap "
+        "targets, leads.json, leads.md for AI agents) to DIR",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print machine-readable JSON (inventory + leads) instead of tables",
+    )
+    parser.add_argument(
+        "--creds", action="store_true", help="Print credentials only (CSV lines)"
+    )
+    parser.add_argument(
+        "--inventory", action="store_true", help="Print hosts/users only"
+    )
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        default="INFO",
+        help="Set the logging level",
+    )
     args = parser.parse_args()
 
-    # Setup logging
-    setup_logger(args.log_level)
+    setup_logger(getattr(logging, args.log_level))
 
-    # Initialize loading animation
-    update_animation, show_ready = show_loading_animation()
+    if not any([args.file, args.read, args.quick_wins]):
+        parser.print_help()
+        return
 
+    # Machine modes keep stdout clean: no banner, no spinner, no tables.
+    machine = bool(args.json or args.creds or args.inventory)
+    # The loading animation writes cursor/clear escape codes to stdout; do not
+    # even initialise it for machine-readable modes.
+    if machine:
+        update_animation, show_ready = None, None
+    else:
+        update_animation, show_ready = show_loading_animation()
+    only = args.only.split(",") if args.only else None
+
+    conn = None
     try:
-        # Create database tables first
         conn = create_database()
         if not conn:
             logging.error("Failed to create database connection. Exiting.")
             sys.exit(1)
-        
-        # Show loading animation
-        animation_running = True
-        
-        def run_animation():
-            while animation_running:
-                update_animation(quick_wins=bool(args.quick_wins))
-                time.sleep(0.2)
-        
-        # Start animation in a separate thread
-        animation_thread = threading.Thread(target=run_animation)
-        animation_thread.start()
+
+        animation_running = not machine
+        animation_thread = None
+        if animation_running:
+
+            def run_animation():
+                while animation_running:
+                    update_animation(quick_wins=bool(args.quick_wins))
+                    time.sleep(0.2)
+
+            animation_thread = threading.Thread(target=run_animation)
+            animation_thread.start()
 
         try:
-            if args.quick_wins:
-                if args.read:
-                    # Read quick wins from database
-                    read_quick_wins_from_db(conn, show_ready)
-                else:
-                    # Analyze PCAP file for quick wins
-                    analyze_quick_wins(args.quick_wins, conn)
-                    # Clear screen and show the final banner only for quick wins mode
-                    os.system('cls' if os.name == 'nt' else 'clear')
+            if args.quick_wins and args.quick_wins is not True:
+                # Quick-win scan of a capture.
+                analyze_quick_wins(args.quick_wins, conn)
+                if not machine:
+                    os.system("cls" if os.name == "nt" else "clear")
                     show_ready(quick_wins=True)
                     logging.info("\033[33mQuick Wins Analysis Starting...\033[0m")
-                    # Display quick wins after analysis
                     read_quick_wins_from_db(conn, show_ready)
             elif args.file:
-                # Parse PCAP file and process all protocols
                 from PufferRelay.pcap_processing.pcap_parser import parse_pcap
-                parsed_data = parse_pcap(args.file)
-                
-                # Store the parsed data in the database
-                from PufferRelay.database.db_queries import process_extracted_data
+
+                parsed_data = parse_pcap(
+                    args.file,
+                    only=only,
+                    credentials_only=args.credentials_only,
+                )
                 process_extracted_data(parsed_data)
-                
-                # Clear screen and show the final banner
-                os.system('cls' if os.name == 'nt' else 'clear')
-                show_ready(quick_wins=False)
-                logging.info("\033[35mPufferRelay Ready...\033[0m")
-                
-                # Display results after showing the banner
-                fetch_all_data(conn)
+
+                # `-f capture -q` adds the quick-win scan to a handler run.
+                if args.quick_wins is True:
+                    analyze_quick_wins(args.file, conn)
+
+                if not machine:
+                    os.system("cls" if os.name == "nt" else "clear")
+                    show_ready(quick_wins=False)
+                    logging.info("\033[35mPufferRelay Ready...\033[0m")
+                    fetch_all_data(conn)
             elif args.read:
-                # Read from database and display all tables
-                os.system('cls' if os.name == 'nt' else 'clear')
-                show_ready(quick_wins=False)
-                logging.info("\033[35mPufferRelay Ready...\033[0m")
-                fetch_all_data(conn)
+                if args.quick_wins:
+                    if not machine:
+                        read_quick_wins_from_db(conn, show_ready)
+                elif not machine:
+                    os.system("cls" if os.name == "nt" else "clear")
+                    show_ready(quick_wins=False)
+                    logging.info("\033[35mPufferRelay Ready...\033[0m")
+                    fetch_all_data(conn)
+
+            if machine:
+                inventory = export.collect_inventory(conn)
+                leads = export.build_leads(inventory)
+                _print_machine_output(args, inventory, leads)
+
+            if args.dump:
+                run_exports(conn, args.dump, pcap_name=args.file or args.quick_wins or "")
         except Exception as e:
             logging.error(f"Error during processing: {str(e)}")
             raise
         finally:
-            # Stop the animation
             animation_running = False
-            animation_thread.join()
+            if animation_thread is not None:
+                animation_thread.join()
     except Exception as e:
         logging.error(f"Error: {str(e)}")
         sys.exit(1)
@@ -163,6 +253,7 @@ def main():
                 conn.close()
             except Exception as e:
                 logging.error(f"Error closing database connection: {str(e)}")
+
 
 if __name__ == "__main__":
     main()

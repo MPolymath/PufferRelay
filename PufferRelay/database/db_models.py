@@ -21,18 +21,16 @@
 from PufferRelay.core_imports import sqlite3
 from PufferRelay.core_imports import logging
 from PufferRelay.config import DB_NAME
-from .db_version import check_database_version, set_db_schema_version
+from .db_version import migrate_database, set_db_schema_version
 
-def create_database():
-    """Creates an SQLite database with tables for storing various protocol requests."""
-    # Check database version first
-    if not check_database_version():
-        logging.error("Database version check failed. Exiting.")
-        return None
-        
+def create_database(db_path=None):
+    """Creates (or migrates) the SQLite database with all protocol tables."""
     conn = None
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(db_path or DB_NAME)
+        if not migrate_database(conn):
+            conn.close()
+            return None
         cursor = conn.cursor()
 
         # Create LDAP requests table
@@ -118,15 +116,17 @@ def create_database():
             )
         """)
 
-        # Create NetBIOS requests table
+        # Create NetBIOS requests table (columns match insert_into_database)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS netbios_requests (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 domain_workgroup TEXT,
                 hostname TEXT,
-                ip TEXT,
-                mac TEXT,
-                UNIQUE(domain_workgroup, hostname, ip, mac)
+                other_service TEXT,
+                src_ip TEXT,
+                src_mac TEXT,
+                service_type TEXT,
+                UNIQUE(domain_workgroup, hostname, other_service, src_ip, src_mac, service_type)
             )
         """)
 
@@ -162,6 +162,18 @@ def create_database():
                 destination_ip TEXT,
                 community_string TEXT,
                 UNIQUE(source_ip, destination_ip, community_string)
+            )
+        """)
+
+        # Create observed services table (dst ip/port seen in the capture)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS observed_services (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ip TEXT,
+                port INTEGER,
+                service TEXT,
+                transport TEXT,
+                UNIQUE(ip, port, transport)
             )
         """)
 

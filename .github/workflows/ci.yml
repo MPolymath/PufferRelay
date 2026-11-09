@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: install tshark
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tshark
+
+      - name: install python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest scapy
+
+      - name: byte-compile
+        run: python -m compileall -q PufferRelay
+
+      - name: tests
+        run: python -m pytest PufferRelay/tests -q

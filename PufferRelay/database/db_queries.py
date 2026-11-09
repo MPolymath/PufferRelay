@@ -38,14 +38,14 @@ def get_terminal_width():
     except:
         return 80
 
-def insert_into_database(protocol, data):
+def insert_into_database(protocol, data, db_path=None):
     """Inserts extracted pertinent information into the database, ensuring uniqueness."""
     if not data:
         return
-        
+
     conn = None
     try:
-        conn = sqlite3.connect(DB_NAME)
+        conn = sqlite3.connect(db_path or DB_NAME)
         cursor = conn.cursor()
         
         # Insert only if the combination does not already exist
@@ -131,6 +131,13 @@ def insert_into_database(protocol, data):
                 VALUES (?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} SNMP records")
+        elif protocol == "services":
+            # (ip, port, service, transport) observed in the capture
+            cursor.executemany("""
+                INSERT OR IGNORE INTO observed_services (ip, port, service, transport)
+                VALUES (?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} service records")
 
         conn.commit()
     except sqlite3.Error as e:
@@ -139,7 +146,7 @@ def insert_into_database(protocol, data):
         if conn:
             conn.close()
 
-def store_data(protocol: str, data):
+def store_data(protocol: str, data, db_path=None):
     """
     Stores extracted protocol data into the database and prints confirmation.
 
@@ -148,10 +155,10 @@ def store_data(protocol: str, data):
         data: Extracted data related to the protocol.
     """
     if data:
-        insert_into_database(protocol, data)
+        insert_into_database(protocol, data, db_path=db_path)
         logging.info(f"{protocol.upper()} data successfully stored in the database.")
 
-def process_extracted_data(parsed_data):
+def process_extracted_data(parsed_data, db_path=None):
     """
     Processes extracted protocol data and stores it if available.
 
@@ -160,7 +167,7 @@ def process_extracted_data(parsed_data):
     """
     for protocol, data in parsed_data.items():
         if data:
-            store_data(protocol, data)
+            store_data(protocol, data, db_path=db_path)
 
     if not any(parsed_data.values()):
         logging.info("No pertinent requests found.")
@@ -474,7 +481,8 @@ def fetch_all_data(conn):
             ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"], "TELNET"),
             ("smtp_requests", ["source_ip", "destination_ip", "smtp_user", "smtp_password"], "SMTP"),
             ("ntlm_requests", ["source_ip", "destination_ip", "username", "ntlm_hash"], "NTLM"),
-            ("netbios_requests", ["domain_workgroup", "hostname", "ip", "mac"], "NetBIOS"),
+            ("netbios_requests", ["domain_workgroup", "hostname", "other_service", "src_ip",
+                                   "src_mac", "service_type"], "NetBIOS"),
             ("imap_requests", ["source_ip", "destination_ip", "username", "password"], "IMAP"),
             ("pop3_requests", ["source_ip", "destination_ip", "username", "password"], "POP3"),
             ("snmp_requests", ["source_ip", "destination_ip", "community_string"], "SNMP")
@@ -485,16 +493,19 @@ def fetch_all_data(conn):
             if protocol == "NetBIOS":
                 # Special handling for NetBIOS data
                 cursor.execute("""
-                    SELECT 
-                        CASE 
+                    SELECT
+                        CASE
                             WHEN domain_workgroup != 'N/A' THEN domain_workgroup
                             WHEN hostname != 'N/A' THEN hostname
-                            ELSE ip
-                        END as identifier,
-                        ip,
-                        mac,
-                        domain_workgroup
-                    FROM netbios_requests 
+                            ELSE COALESCE(NULLIF(other_service, 'N/A'), src_ip)
+                        END AS identifier,
+                        src_ip,
+                        src_mac,
+                        CASE
+                            WHEN domain_workgroup != 'N/A' THEN domain_workgroup
+                            ELSE service_type
+                        END AS domain_workgroup
+                    FROM netbios_requests
                     ORDER BY identifier, domain_workgroup
                 """)
                 data = cursor.fetchall()

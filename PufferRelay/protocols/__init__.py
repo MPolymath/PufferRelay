@@ -29,6 +29,7 @@ from .netbios_handler import process_netbios
 from .imap_handler import process_imap
 from .pop3_handler import process_pop3
 from .snmp_handler import process_snmp
+from .services_handler import process_services
 
 __all__ = [
     'process_ldap',
@@ -41,5 +42,6 @@ __all__ = [
     'process_netbios',
     'process_imap',
     'process_pop3',
-    'process_snmp'
+    'process_snmp',
+    'process_services'
 ]
