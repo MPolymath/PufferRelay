@@ -25,7 +25,8 @@ status board.
 
 - [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
-- [ ] #62 relay scenario enumeration (SMB/LDAP signing + NTLM flows).
+- [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM
+      over SMB/LDAP/HTTP; relay-targets.txt + RELAY leads).
 - [ ] #44 SMB extraction (shares, files, users, signing).
 - [ ] #57 file carving from HTTP/SMB/FTP streams.
 - [ ] #15 BloodHound JSON export from captured identities/sessions.

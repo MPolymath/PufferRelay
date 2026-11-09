@@ -370,6 +370,30 @@ def collect_quick_wins(conn: sqlite3.Connection) -> List[Dict]:
     return out
 
 
+def collect_relays(conn: sqlite3.Connection) -> List[Dict]:
+    """NTLM relay candidates observed in the capture (issue #62)."""
+    out = []
+    if not _has_table(conn, "relay_scenarios"):
+        return out
+    for src, dst, port, protocol, user, signing, candidate in _rows(
+        conn,
+        "SELECT src_ip, dst_ip, dst_port, protocol, username, signing_required, "
+        "candidate FROM relay_scenarios",
+    ):
+        out.append(
+            {
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "destination_port": port or 0,
+                "protocol": protocol or "unknown",
+                "username": user or "",
+                "signing_required": None if signing == "" else bool(signing),
+                "candidate": bool(candidate),
+            }
+        )
+    return out
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
     return {
         "hosts": collect_hosts(conn),
@@ -377,6 +401,7 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "credentials": collect_credentials(conn),
         "hashes": collect_hashes(conn),
         "quick_wins": collect_quick_wins(conn),
+        "relays": collect_relays(conn),
     }
 
 
@@ -637,6 +662,48 @@ def build_leads(inventory: Dict) -> List[Dict]:
                         "active": False,
                         "warning": "Offline only; safe for the target network.",
                     }
+                ],
+            }
+        )
+
+    # 3b. Confirmed NTLM relay paths.
+    relays = inventory.get("relays", [])
+    for i, relay in enumerate([r for r in relays if r.get("candidate")], start=1):
+        proto = relay["protocol"]
+        severity = "critical" if proto == "smb" else "high"
+        signing = relay["signing_required"]
+        signing_text = (
+            "signing not required"
+            if signing is False
+            else "signing state unknown (SMB NEGOTIATE not captured)"
+            if signing is None
+            else "signing required"
+        )
+        add(
+            {
+                "id": f"RELAY-{i:03d}",
+                "severity": severity,
+                "title": f"NTLM relay candidate: {proto} to {relay['destination_ip']}"
+                f":{relay['destination_port']}",
+                "why": f"An NTLM authentication for "
+                f"'{relay['username'] or 'unknown user'}' was captured towards this "
+                f"endpoint ({signing_text}). A relay can impersonate that user if the "
+                f"authentication is still valid.",
+                "evidence": relay,
+                "suggested_actions": [
+                    {
+                        "intent": "Add the endpoint to a relay target list (offline step)",
+                        "command": "grep . relay-targets.txt",
+                        "active": False,
+                        "warning": "Reading a local file; no traffic.",
+                    },
+                    {
+                        "intent": "Relay captured NTLM traffic to these targets (scope-gated)",
+                        "command": "ntlmrelayx.py -tf relay-targets.txt -smb2support",
+                        "active": True,
+                        "warning": "Active: relays credentials to in-scope hosts. Confirm "
+                        "authorisation; this can lock accounts or trigger alarms.",
+                    },
                 ],
             }
         )
@@ -922,6 +989,19 @@ def write_exports(
         path("asrep-hashes.txt"),
         [h["hash"] for h in inventory["hashes"] if h["hash"] and h["hashcat_mode"] == 18200],
     )
+    relay_rows = inventory.get("relays", [])
+    _write_text(
+        path("relay-targets.txt"),
+        sorted({r["destination_ip"] for r in relay_rows if r.get("candidate") and r["destination_ip"]}),
+    )
+    relay_lines = ["source_ip	destination_ip	port	protocol	username	signing	candidate"]
+    for r in relay_rows:
+        signing = "-" if r["signing_required"] is None else int(r["signing_required"])
+        relay_lines.append(
+            f"{r['source_ip']}	{r['destination_ip']}	{r['destination_port']}	"
+            f"{r['protocol']}	{r['username'] or '-'}	{signing}	{int(r['candidate'])}"
+        )
+    _write_text(path("relays.tsv"), relay_lines)
 
     _write_json(path("summary.json"), {"inventory": inventory, "leads": leads})
     _write_json(

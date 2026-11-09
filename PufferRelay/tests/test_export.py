@@ -130,6 +130,8 @@ def test_write_exports_pack():
             "credentials.csv",
             "ntlm-hashes.txt",
             "asrep-hashes.txt",
+            "relay-targets.txt",
+            "relays.tsv",
             "summary.json",
             "leads.json",
             "leads.md",

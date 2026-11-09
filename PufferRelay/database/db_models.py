@@ -165,6 +165,21 @@ def create_database(db_path=None):
             )
         """)
 
+        # Create NTLM relay candidates (issue #62)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS relay_scenarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                dst_port INTEGER,
+                protocol TEXT,
+                username TEXT,
+                signing_required INTEGER,
+                candidate INTEGER,
+                UNIQUE(src_ip, dst_ip, dst_port, protocol, username, candidate)
+            )
+        """)
+
         # Create AS-REP roasting candidates (issue #61)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS kerberos_asrep (

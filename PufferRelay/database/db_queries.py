@@ -131,6 +131,15 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} SNMP records")
+        elif protocol == "relays":
+            # (src_ip, dst_ip, dst_port, protocol, username, signing, candidate)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO relay_scenarios
+                    (src_ip, dst_ip, dst_port, protocol, username, signing_required,
+                     candidate)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} relay candidates")
         elif protocol == "kerberos":
             # (username, realm, etype, hash, src_ip, dst_ip)
             cursor.executemany("""
@@ -203,6 +212,9 @@ PROTOCOL_TABLES = {
     "services": ("observed_services", ["ip", "port", "service", "transport"]),
     "kerberos": ("kerberos_asrep",
                  ["username", "realm", "etype", "hash", "src_ip", "dst_ip"]),
+    "relays": ("relay_scenarios",
+               ["src_ip", "dst_ip", "dst_port", "protocol", "username",
+                "signing_required", "candidate"]),
     "ips": ("ip_requests", ["subnet", "ip"]),
 }
 

@@ -31,6 +31,7 @@ from .pop3_handler import process_pop3
 from .snmp_handler import process_snmp
 from .services_handler import process_services
 from .kerberos_handler import process_kerberos
+from .relay_handler import process_relays
 
 __all__ = [
     'process_ldap',
@@ -45,5 +46,6 @@ __all__ = [
     'process_pop3',
     'process_snmp',
     'process_services',
-    'process_kerberos'
+    'process_kerberos',
+    'process_relays'
 ]

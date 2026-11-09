@@ -68,6 +68,8 @@ Rules an agent must follow when consuming it:
 | `credentials.csv` | `protocol,source_ip,destination_ip,username,secret,context` | reuse, reporting |
 | `ntlm-hashes.txt` | NetNTLM hashes | `hashcat -m 5600` |
 | `asrep-hashes.txt` | AS-REP roastable accounts | `hashcat -m 18200` |
+| `relay-targets.txt` | destination IPs that accept relayed NTLM | `ntlmrelayx.py -tf` |
+| `relays.tsv` | src, dst, port, protocol, username, signing, candidate | relay planning / report |
 | `summary.json` | inventory + leads | dashboards, diffing runs |
 
 ## CLI filters (issue #48)
