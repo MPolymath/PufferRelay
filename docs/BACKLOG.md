@@ -34,5 +34,5 @@ status board.
 
 - Quick-win scan (`-q`) still regexes every packet; move to targeted tshark
   filters (#55).
-- `-r --protocol` filter not implemented yet (use `--json`/`--creds` for now).
+- `-r --protocol` prints raw rows; column-level filters are not implemented yet.
 - No live capture; by design until Tier B with warnings.

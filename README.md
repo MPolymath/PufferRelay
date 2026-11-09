@@ -66,6 +66,7 @@ sends traffic). See [docs/OUTPUTS.md](docs/OUTPUTS.md) and
 pufferrelay -r --json <br>
 pufferrelay -r --creds <br>
 pufferrelay -r --inventory <br>
+pufferrelay -r --protocol ftp,ntlm <br>
 
 ### Documentation
 The <a href="https://mpolymath.gitbook.io/pufferrelay">Wiki</a> is under construction but will be available soon !

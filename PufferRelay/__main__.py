@@ -34,7 +34,10 @@ from PufferRelay.database.db_models import create_database
 from PufferRelay.database.db_queries import (
     get_quick_wins,
     display_quick_wins,
+    display_table,
     fetch_all_data,
+    fetch_protocol,
+    protocol_headers,
     process_extracted_data,
 )
 from PufferRelay.protocols.quick_wins import analyze_quick_wins
@@ -150,6 +153,11 @@ def main():
         "--inventory", action="store_true", help="Print hosts/users only"
     )
     parser.add_argument(
+        "--protocol",
+        help="With -r: show the raw rows of these protocols "
+        "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,services,ips)",
+    )
+    parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
@@ -220,6 +228,19 @@ def main():
                     show_ready(quick_wins=False)
                     logging.info("\033[35mPufferRelay Ready...\033[0m")
                     fetch_all_data(conn)
+            elif args.read and args.protocol:
+                for name in [p.strip().lower() for p in args.protocol.split(",") if p.strip()]:
+                    rows = fetch_protocol(conn, name)
+                    if not rows:
+                        print(f"(no rows for {name})")
+                        continue
+                    headers = protocol_headers(name)
+                    if machine:
+                        print("	".join(headers))
+                        for row in rows:
+                            print("	".join(str(value) for value in row))
+                    else:
+                        display_table(rows, headers, name.upper())
             elif args.read:
                 if args.quick_wins:
                     if not machine:
@@ -230,7 +251,7 @@ def main():
                     logging.info("\033[35mPufferRelay Ready...\033[0m")
                     fetch_all_data(conn)
 
-            if machine:
+            if machine and not args.protocol:
                 inventory = export.collect_inventory(conn)
                 leads = export.build_leads(inventory)
                 _print_machine_output(args, inventory, leads)

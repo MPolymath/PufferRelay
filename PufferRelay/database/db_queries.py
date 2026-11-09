@@ -172,6 +172,48 @@ def process_extracted_data(parsed_data, db_path=None):
     if not any(parsed_data.values()):
         logging.info("No pertinent requests found.")
 
+# Raw table view used by "-r --protocol" (issue #40).
+PROTOCOL_TABLES = {
+    "ldap": ("ldap_requests",
+             ["source_ip", "destination_ip", "ldap_name", "ldap_simple"]),
+    "http": ("http_requests",
+             ["source_ip", "destination_ip", "http_url", "http_form",
+              "http_auth_username", "http_auth_password"]),
+    "ftp": ("ftp_requests",
+            ["source_ip", "destination_ip", "ftp_request_command", "ftp_request_arg"]),
+    "telnet": ("telnet_requests", ["source_ip", "destination_ip", "telnet_data"]),
+    "smtp": ("smtp_requests",
+             ["source_ip", "destination_ip", "smtp_user", "smtp_password"]),
+    "ntlm": ("ntlm_requests",
+             ["source_ip", "destination_ip", "username", "ntlm_hash"]),
+    "netbios": ("netbios_requests",
+                ["domain_workgroup", "hostname", "other_service", "src_ip", "src_mac",
+                 "service_type"]),
+    "imap": ("imap_requests", ["source_ip", "destination_ip", "username", "password"]),
+    "pop3": ("pop3_requests", ["source_ip", "destination_ip", "username", "password"]),
+    "snmp": ("snmp_requests", ["source_ip", "destination_ip", "community_string"]),
+    "services": ("observed_services", ["ip", "port", "service", "transport"]),
+    "ips": ("ip_requests", ["subnet", "ip"]),
+}
+
+
+def fetch_protocol(conn, protocol):
+    """Return raw rows for one protocol table, or [] when unknown/empty."""
+    entry = PROTOCOL_TABLES.get(protocol.lower())
+    if not entry:
+        return []
+    table_name, columns = entry
+    return fetch_requests(conn, table_name, columns, protocol.lower())
+
+
+def protocol_headers(protocol):
+    """Column headers matching fetch_protocol()."""
+    entry = PROTOCOL_TABLES.get(protocol.lower())
+    if not entry:
+        return []
+    return ["Protocol"] + [column.replace("_", " ").title() for column in entry[1]]
+
+
 def fetch_requests(conn, table_name, columns, protocol, conditions=None):
     """
     Fetch data from a specific database table and return formatted results.

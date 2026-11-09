@@ -76,6 +76,8 @@ pufferrelay -f capture.pcap --credentials-only        # identities/credentials o
 pufferrelay -r --json                                  # inventory + leads as JSON
 pufferrelay -r --creds                                 # credential rows only
 pufferrelay -r --inventory                             # hosts/users only
+pufferrelay -r --protocol ftp,ntlm                     # raw rows for those protocols
+pufferrelay -r --protocol ftp --json                  # tab-separated (machine mode)
 ```
 
 ## Notes

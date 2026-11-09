@@ -684,6 +684,13 @@ def leads_to_markdown(inventory: Dict, leads: Sequence[Dict], pcap_name: str = "
         "Everything below was extracted passively from the capture. Commands marked "
         "ACTIVE send traffic: confirm authorisation and scope before running them."
     )
+    if not any(qw.get("found") for qw in inventory.get("quick_wins", [])):
+        lines.append("")
+        lines.append(
+            "> No quick-win scan is recorded in this database. Re-run with "
+            "`-q <capture>` (and `--dump`) to add protocol-level leads "
+            "(SMB/LDAP signing, cleartext services, LLMNR, ...)."
+        )
     lines.append("")
 
     for lead in leads:
