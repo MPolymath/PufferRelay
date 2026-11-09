@@ -18,68 +18,42 @@
 # Credits: Portions of this code were adapted from PCredz (https://github.com/lgandx/PCredz)
 #         (c) Laurent Gaffie GNU General Public License v3.0.
 
-from PufferRelay.core_imports import pyshark, logging
+from PufferRelay.core_imports import logging
+from PufferRelay.tshark_fields import fields
 from ipaddress import ip_network, ip_address
 from collections import defaultdict
 
 def process_ips(pcap_file):
     """
     Extracts all unique source and destination IPs from a pcap file and groups them by subnet.
-    
+
     Args:
         pcap_file (str): Path to the pcap file
-        
+
     Returns:
         list: List of tuples containing (subnet, list_of_ips)
     """
-    capture = None
-    try:
-        # Open the capture file without any filter to get all packets
-        # JSON output is stable; raw data and pyshark debug are not needed
-        # and made big captures slow and noisy (#52, #55).
-        capture = pyshark.FileCapture(pcap_file, use_json=True)
-        
-        unique_ips = set()
-        
-        for packet in capture:  
-            try:
-                # Extract source and destination IPs
-                if hasattr(packet, 'ip'):
-                    src_ip = packet.ip.src
-                    dst_ip = packet.ip.dst
-                    unique_ips.add(src_ip)
-                    unique_ips.add(dst_ip)
-            except AttributeError:
-                continue
-        
-        # Group IPs by subnet
-        subnet_groups = defaultdict(list)
-        for ip in unique_ips:
-            try:
-                # Convert IP to network object to get subnet
-                network = ip_network(f"{ip}/24", strict=False)  # Using /24 as default subnet
-                subnet = str(network)
-                subnet_groups[subnet].append(ip)
-            except ValueError:
-                # Handle invalid IP addresses
-                continue
-        
-        # Sort IPs within each subnet
-        for subnet in subnet_groups:
-            subnet_groups[subnet].sort(key=ip_address)
-        
-        # Convert to list of tuples and sort by subnet
-        result = [(subnet, ips) for subnet, ips in subnet_groups.items()]
-        result.sort(key=lambda x: ip_network(x[0]))
-        
-        return result
-    except Exception as e:
-        logging.error(f"Error processing IPs: {str(e)}")
-        raise
-    finally:
-        # Properly close the capture in the finally block
-        if capture is not None:
-            try:
-                capture.close()
-            except Exception as e:
-                logging.error(f"Error closing capture: {str(e)}") 
+    rows = fields(pcap_file, "ip", ["ip.src", "ip.dst"])
+    unique_ips = set()
+    for src_ip, dst_ip in rows:
+        if src_ip:
+            unique_ips.add(src_ip)
+        if dst_ip:
+            unique_ips.add(dst_ip)
+
+    subnet_groups = defaultdict(list)
+    for ip in unique_ips:
+        try:
+            network = ip_network(f"{ip}/24", strict=False)
+            subnet = str(network)
+            subnet_groups[subnet].append(ip)
+        except ValueError:
+            continue
+
+    for subnet in subnet_groups:
+        subnet_groups[subnet].sort(key=ip_address)
+
+    result = [(subnet, ips) for subnet, ips in subnet_groups.items()]
+    result.sort(key=lambda x: ip_network(x[0]))
+    logging.info("Extracted %d unique IPs in %d subnets", len(unique_ips), len(result))
+    return result 

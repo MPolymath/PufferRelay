@@ -40,8 +40,6 @@ SMB_PORTS = {139, 445}
 LDAP_PORTS = {389, 3268}
 HTTP_PORTS = {80, 8080, 5985, 8000, 8888}
 
-SMB2_NEGOTIATE_SIGNING_REQUIRED = 0x0002
-
 
 def classify(protocol: str, signing_required: Optional[bool]) -> bool:
     """Would this endpoint accept an relayed NTLM authentication?
@@ -150,7 +148,7 @@ def process_relays(pcap_file):
                 dst_ip = packet.ip.dst if hasattr(packet, "ip") else ""
                 # Track SMB2 NEGOTIATE signing requirements per server.
                 if hasattr(packet, "smb2") and dst_ip:
-                    flags = _get(packet, "smb2", "smb2.negotiate_flags")
+                    flags = _get(packet, "smb2", "smb2.sec_mode.sign_required")
                     value = _parse_flags(flags)
                     if value is not None:
                         signing[dst_ip] = bool(value & SMB2_NEGOTIATE_SIGNING_REQUIRED)

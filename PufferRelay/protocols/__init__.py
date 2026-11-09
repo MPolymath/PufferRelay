@@ -18,21 +18,23 @@
 # Credits: Portions of this code were adapted from PCredz (https://github.com/lgandx/PCredz)
 #         (c) Laurent Gaffie GNU General Public License v3.0.
 
-from .ldap_handler import process_ldap
-from .http_handler import process_http
-from .ftp_handler import process_ftp
-from .telnet_handler import process_telnet
-from .smtp_handler import process_smtp
+from .fields_handlers import (
+    process_ftp,
+    process_http,
+    process_imap,
+    process_kerberos,
+    process_ldap,
+    process_netbios,
+    process_pop3,
+    process_relays,
+    process_smb,
+    process_smtp,
+    process_snmp,
+    process_telnet,
+)
 from .ip_handler import process_ips
-from .ntlm_handler import process_ntlm
-from .netbios_handler import process_netbios
-from .imap_handler import process_imap
-from .pop3_handler import process_pop3
-from .snmp_handler import process_snmp
+from .ntlm_fast import process_ntlm
 from .services_handler import process_services
-from .kerberos_handler import process_kerberos
-from .relay_handler import process_relays
-from .smb_handler import process_smb
 from .files_handler import process_files
 
 __all__ = [

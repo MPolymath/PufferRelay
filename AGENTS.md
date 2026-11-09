@@ -52,11 +52,14 @@ PufferRelay/
   config.py              DB_NAME, logging paths (cwd based)
   core_imports.py        single import surface (pyshark, rich, sqlite3, ...)
   pcap_processing/
-    pcap_parser.py       opens the pcap once per handler, builds the dict
+    pcap_parser.py       handler registry + --only/--credentials-only filters
+  tshark_fields.py       one-pass `tshark -T fields` extraction (fast path)
+  protocols/
+    fields_handlers.py   field-based implementations of the protocol handlers
   protocols/
     __init__.py          exports every process_* handler
-    <proto>_handler.py   one file per protocol: pyshark FileCapture +
-                         display_filter -> list of tuples
+    <proto>_handler.py   legacy pyshark handlers (unused; kept for reference
+                         until the cleanup commit)
     quick_wins.py        regex sweep over every packet for "quick win" flags
   database/
     db_models.py         CREATE TABLE IF NOT EXISTS + quick_wins seed

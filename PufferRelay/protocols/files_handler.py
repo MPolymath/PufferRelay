@@ -32,7 +32,7 @@ import logging
 import re
 from typing import Optional
 
-from PufferRelay.core_imports import pyshark
+from PufferRelay.tshark_fields import fields
 
 MAX_FILE_BYTES = 1024 * 1024  # per object
 MAX_TOTAL_BYTES = 16 * 1024 * 1024  # per capture
@@ -110,16 +110,6 @@ def headers_from_payload(payload_hex: str):
     return content_type, disposition
 
 
-def _get(packet, layer: str, field: str) -> str:
-    try:
-        value = getattr(packet, layer).get(field, "")
-    except (AttributeError, TypeError):
-        return ""
-    if isinstance(value, (list, tuple)):
-        return str(value[0]) if value else ""
-    return str(value) if value is not None else ""
-
-
 def process_files(pcap_file):
     """Extract HTTP/FTP objects from the capture.
 
@@ -127,69 +117,60 @@ def process_files(pcap_file):
         list[tuple]: (protocol, src_ip, dst_ip, filename, content_type, size,
         sha256, data)
     """
-    capture = None
-    try:
-        capture = pyshark.FileCapture(
-            pcap_file, display_filter="(http.response && http.file_data) || ftp-data"
-        )
-        rows = []
-        seen = set()
-        total = 0
+    rows = fields(
+        pcap_file,
+        "(http.response && http.file_data) || ftp-data",
+        [
+            "ip.src",
+            "ip.dst",
+            "http.content_type",
+            "http.file_data",
+            "tcp.payload",
+            "data.data",
+        ],
+    )
+    out = []
+    seen = set()
+    total = 0
 
-        for packet in capture:
-            try:
-                src_ip = packet.ip.src if hasattr(packet, "ip") else ""
-                dst_ip = packet.ip.dst if hasattr(packet, "ip") else ""
-
-                if hasattr(packet, "http"):
-                    protocol = "http"
-                    data_hex = _get(packet, "http", "http.file_data")
-                    content_type = _get(packet, "http", "http.content_type")
-                    disposition = ""
-                else:
-                    protocol = "ftp-data"
-                    data_hex = _get(packet, "data", "data.data")
-                    content_type = ""
-                    disposition = ""
-
-                raw = decode_hex_field(data_hex)
-                if not raw or len(raw) > MAX_FILE_BYTES:
-                    continue
-                if total + len(raw) > MAX_TOTAL_BYTES:
-                    logging.warning("File carving budget reached; stopping")
-                    break
-
-                digest = sha256_bytes(raw)
-                if digest in seen:
-                    continue
-                seen.add(digest)
-                total += len(raw)
-
-                if not disposition and hasattr(packet, "tcp"):
-                    raw_ct, disposition = headers_from_payload(
-                        _get(packet, "tcp", "tcp.payload")
-                    )
-                    if raw_ct:
-                        content_type = raw_ct
-
-                name = filename_from_disposition(disposition)
-                name = safe_filename(name, f"{protocol}-{digest[:12]}")
-                rows.append(
-                    (protocol, src_ip, dst_ip, name, content_type or "", len(raw),
-                     digest, raw)
-                )
-            except Exception as packet_error:
-                logging.debug("Skipping file packet: %s", packet_error)
+    for src_ip, dst_ip, content_type, http_data, tcp_payload, data_payload in rows:
+        try:
+            if http_data:
+                protocol = "http"
+                data_hex = http_data
+            elif data_payload:
+                protocol = "ftp-data"
+                data_hex = data_payload
+            else:
                 continue
 
-        logging.info("Carved %d file object(s)", len(rows))
-        return rows
-    except Exception as e:
-        logging.error("Error carving files: %s", str(e))
-        raise
-    finally:
-        if capture is not None:
-            try:
-                capture.close()
-            except Exception as e:
-                logging.error("Error closing capture: %s", str(e))
+            raw = decode_hex_field(data_hex)
+            if not raw or len(raw) > MAX_FILE_BYTES:
+                continue
+            if total + len(raw) > MAX_TOTAL_BYTES:
+                logging.warning("File carving budget reached; stopping")
+                break
+
+            digest = sha256_bytes(raw)
+            if digest in seen:
+                continue
+            seen.add(digest)
+            total += len(raw)
+
+            disposition = ""
+            if tcp_payload:
+                raw_ct, disposition = headers_from_payload(tcp_payload)
+                if raw_ct and not content_type:
+                    content_type = raw_ct
+
+            name = filename_from_disposition(disposition)
+            name = safe_filename(name, f"{protocol}-{digest[:12]}")
+            out.append(
+                (protocol, src_ip, dst_ip, name, content_type or "", len(raw), digest, raw)
+            )
+        except Exception as packet_error:
+            logging.debug("Skipping file object: %s", packet_error)
+            continue
+
+    logging.info("Carved %d file object(s)", len(out))
+    return out

@@ -23,9 +23,9 @@
 Passive: reads SYN packets from the capture (``syn=1, ack=0``). This is the
 cheapest way to build a nmap target list without scanning anything.
 """
-
-from PufferRelay.core_imports import pyshark, logging
+from PufferRelay.core_imports import logging
 from PufferRelay.export import service_for_port
+from PufferRelay.tshark_fields import fields
 
 
 def process_services(pcap_file):
@@ -34,34 +34,24 @@ def process_services(pcap_file):
     Returns:
         list: list of tuples (ip, port, service, transport)
     """
-    capture = None
-    try:
-        capture = pyshark.FileCapture(
-            pcap_file, display_filter="tcp.flags.syn==1 && tcp.flags.ack==0"
-        )
-        rows = []
-        seen = set()
-        for packet in capture:
-            try:
-                if not hasattr(packet, "ip") or not hasattr(packet, "tcp"):
-                    continue
-                dst_ip = packet.ip.dst
-                dst_port = int(packet.tcp.dstport)
-            except (AttributeError, ValueError):
-                continue
-            key = (dst_ip, dst_port)
-            if key in seen:
-                continue
-            seen.add(key)
-            rows.append((dst_ip, dst_port, service_for_port(dst_port), "tcp"))
-        logging.info("Extracted %d observed services", len(rows))
-        return rows
-    except Exception as e:
-        logging.error("Error processing observed services: %s", str(e))
-        raise
-    finally:
-        if capture is not None:
-            try:
-                capture.close()
-            except Exception as e:
-                logging.error("Error closing capture: %s", str(e))
+    rows = fields(
+        pcap_file,
+        "tcp.flags.syn==1 && tcp.flags.ack==0",
+        ["ip.dst", "tcp.dstport"],
+    )
+    out = []
+    seen = set()
+    for dst_ip, port_text in rows:
+        try:
+            dst_port = int(port_text)
+        except (TypeError, ValueError):
+            continue
+        if not dst_ip:
+            continue
+        key = (dst_ip, dst_port)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((dst_ip, dst_port, service_for_port(dst_port), "tcp"))
+    logging.info("Extracted %d observed services", len(out))
+    return out
