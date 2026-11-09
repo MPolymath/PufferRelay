@@ -1621,7 +1621,11 @@ def build_leads(inventory: Dict) -> List[Dict]:
 
     # 3h. Database credentials and crackable responses.
     for i, row in enumerate(inventory.get("database_credentials", []), start=1):
-        cleartext = row["kind"] in {"redis-cleartext", "pg-cleartext"}
+        cleartext = row["kind"] in {
+            "redis-cleartext",
+            "pg-cleartext",
+            "mssql-sql-auth",
+        }
         add(
             {
                 "id": f"DB-{i:03d}",

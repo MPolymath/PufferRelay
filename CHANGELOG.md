@@ -1,3 +1,15 @@
+# PufferRelay 1.1.1 — 2026-11-09
+
+Coverage completion after 1.1.0:
+
+- MSSQL SQL authentication (username/password from `tds.login`) is now part of
+  the database pass and `db-creds.tsv`; Windows auth remains with NTLM.
+- SIP digest parsing: username/realm/nonce plus a fingerprint of the response
+  (never the raw response) in the VoIP evidence.
+- SMB3 awareness: encrypted sessions and encryption capability are reported in
+  `fingerprints.tsv` so a missing SMB carve is explained rather than silent.
+- Tests: 150 passing.
+
 # PufferRelay 1.1.0 — 2026-11-09
 
 Passive capture analysis for authorised engagements. No client data leaves the

@@ -91,8 +91,38 @@ def _tftp(pcap_file):
     return out
 
 
+def _smb3(pcap_file):
+    out = []
+    rows = fields(
+        pcap_file,
+        "smb2.ses_flags.encrypt || smb2.capabilities.encryption",
+        ["ip.src", "ip.dst", "smb2.capabilities.encryption", "smb2.ses_flags.encrypt"],
+    )
+    for src, dst, capable, encrypted in rows:
+        encrypted_on = str(encrypted or "").strip().lower() in {"1", "true", "yes"}
+        kind = "smb3-encrypted" if encrypted_on else "smb3-capable"
+        severity = "medium" if encrypted_on else "low"
+        detail = (
+            "SMB3 session is encrypted; object carving cannot see file content"
+            if encrypted_on
+            else "SMB3 encryption is supported (session not observed encrypted)"
+        )
+        out.append(
+            (kind, severity, src or "", dst or "", "", detail,
+             json.dumps({"capable": capable or "", "encrypted": encrypted or ""},
+                        sort_keys=True))
+        )
+    return out
+
+
 def process_fingerprints(pcap_file):
-    rows = _ssh(pcap_file) + _tls(pcap_file) + _vnc(pcap_file) + _tftp(pcap_file)
+    rows = (
+        _ssh(pcap_file)
+        + _tls(pcap_file)
+        + _vnc(pcap_file)
+        + _tftp(pcap_file)
+        + _smb3(pcap_file)
+    )
     deduped = []
     seen = set()
     for row in rows:

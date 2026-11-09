@@ -107,7 +107,10 @@ def test_voip_sip_and_skinny(monkeypatch):
         if display_filter == "sip":
             return [
                 ("10.0.0.5", "10.0.0.6", "REGISTER", "1001", "registrar",
-                 "abc@1", "Digest username=1001", "", "Cisco/14"),
+                 "abc@1",
+                 'Digest username="1001", realm="corp", nonce="abc", '
+                 'uri="sip:registrar", response="deadbeef"',
+                 "", "Cisco/14"),
                 ("10.0.0.5", "10.0.0.6", "INVITE", "1001", "1002",
                  "def@2", "", "", "Cisco/14"),
             ]
@@ -117,6 +120,10 @@ def test_voip_sip_and_skinny(monkeypatch):
     result = voip.process_voip("x.pcap")
     kinds = {row[0] for row in result}
     assert kinds == {"sip-register-auth", "sip-call", "skinny-call"}
+    register = next(row for row in result if row[0] == "sip-register-auth")
+    evidence = json.loads(register[8])
+    assert evidence["digest"]["username"] == "1001"
+    assert evidence["digest"]["response_sha256"]
 
 
 def test_voip_and_media_flow_to_export():

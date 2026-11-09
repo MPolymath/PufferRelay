@@ -110,12 +110,15 @@ def test_fingerprints(monkeypatch):
                 ("10.0.0.5", "10.0.0.12", "5900", "3.8", "1", "box"),
                 ("10.0.0.5", "10.0.0.13", "5900", "3.8", "2", "box2"),
             ]
+        if "smb2.ses_flags" in display_filter:
+            return [("10.0.0.5", "10.0.0.15", "1", "1")]
         return [("10.0.0.5", "10.0.0.14", "boot.img", "")]
 
     monkeypatch.setattr(fingerprints, "fields", fake_fields)
     result = fingerprints.process_fingerprints("x.pcap")
     kinds = {row[0] for row in result}
-    assert {"ssh-banner", "tls-sni", "vnc-noauth", "vnc-version", "tftp-file"} <= kinds
+    assert {"ssh-banner", "tls-sni", "vnc-noauth", "vnc-version", "tftp-file",
+            "smb3-encrypted"} <= kinds
     vnc = next(row for row in result if row[0] == "vnc-noauth")
     assert vnc[1] == "high"
 

@@ -87,6 +87,8 @@ def test_database_hash_formats(monkeypatch):
         ("10.0.0.5", "10.0.0.30", "5432", "", "", "", "", "user", "alice", "", "", "", ""),
         ("10.0.0.5", "10.0.0.30", "5432", "", "", "", "", "", "", "md5deadbeef", "5", "", ""),
         ("10.0.0.5", "10.0.0.40", "6379", redis, "", "", "", "", "", "", "", "", ""),
+        ("10.0.0.5", "10.0.0.50", "1433", "", "", "", "", "", "", "", "", "", "",
+         "sa", "SqlPass1!", "dbhost"),
     ]
     monkeypatch.setattr(database_auth, "fields", lambda *a, **k: rows)
     result = database_auth.process_database_auth("x.pcap")
@@ -97,6 +99,8 @@ def test_database_hash_formats(monkeypatch):
     assert postgres[8] == "12"
     redis_row = next(row for row in result if row[0] == "redis")
     assert redis_row[4] == "s3cret!!"
+    mssql = next(row for row in result if row[0] == "mssql")
+    assert mssql[4] == "SqlPass1!" and mssql[5] == "mssql-sql-auth"
 
 
 def test_auto_profile_selection():

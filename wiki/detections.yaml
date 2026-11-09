@@ -383,10 +383,10 @@
   handler: dbcreds
   mode: passive
   when: "Redis, MySQL or PostgreSQL traffic is present"
-  detects: "Redis AUTH clear text, MySQL login salt/response as a MySQL CRAM hashcat 11200 line, PostgreSQL startup parameters plus clear-text or MD5 (hashcat 12) auth"
+  detects: "Redis AUTH clear text, MySQL login salt/response as a MySQL CRAM hashcat 11200 line, PostgreSQL startup parameters plus clear-text or MD5 (hashcat 12) auth, MSSQL SQL-auth username/password"
   proves: "reusable database material or a crackable authentication response was sent"
-  limits: "MSSQL stays with the NTLM handler; SCRAM exchanges expose only the mechanism"
-  fields: "tcp.payload, mysql.user, mysql.passwd, mysql.salt, pgsql.parameter_name, pgsql.password, pgsql.authtype, pgsql.salt"
+  limits: "SCRAM exchanges expose only the mechanism; MSSQL Windows auth stays with the NTLM handler"
+  fields: "tcp.payload, mysql.user, mysql.passwd, mysql.salt, pgsql.parameter_name, pgsql.password, pgsql.authtype, pgsql.salt, tds.login.username, tds.login.password"
   output: "db-creds.tsv; leads DB-*"
   severity: critical
   next: "reuse clear-text credentials (scope-gated) or crack the response offline"
@@ -503,9 +503,9 @@
   handler: voip
   mode: passive
   when: "SIP or Cisco Skinny/SCCP signalling is present"
-  detects: "SIP methods (REGISTER/INVITE/MESSAGE), caller/callee, Call-ID, digest auth presence; Skinny call party metadata"
+  detects: "SIP methods (REGISTER/INVITE/MESSAGE), caller/callee, Call-ID, digest auth presence and digest fields; Skinny call party metadata"
   proves: "call signalling was visible in clear text and which endpoints registered/called"
-  limits: "media (RTP) is not decoded; TLS/SIPS is opaque; digest challenges are not cracked"
+  limits: "media (RTP) is not decoded; TLS/SIPS is opaque; digest response is fingerprinted, not cracked"
   fields: "sip.Method, sip.from.user, sip.to.user, sip.Call-ID, sip.Authorization, skinny.CallingPartyNumber"
   output: "voip.tsv; leads VOIP-*"
   severity: medium
@@ -518,10 +518,10 @@
   handler: fingerprints
   mode: passive
   when: "SSH, TLS, VNC or TFTP traffic is present"
-  detects: "SSH banners, TLS SNI and version, VNC protocol/security type, TFTP file names"
+  detects: "SSH banners, TLS SNI and version, VNC protocol/security type, TFTP file names, SMB3 encryption capability/session"
   proves: "these services were exposed and which versions/encryption they offered"
-  limits: "banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises"
-  fields: "ssh.protocol, tls.handshake.extensions_server_name, vnc.server_proto_ver, vnc.server_security_type, tftp.source_file"
+  limits: "banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises; SMB3 encryption makes content opaque"
+  fields: "ssh.protocol, tls.handshake.extensions_server_name, vnc.server_proto_ver, vnc.server_security_type, tftp.source_file, smb2.ses_flags.encrypt"
   output: "fingerprints.tsv; leads FP-*"
   severity: medium
   next: "prioritise no-auth VNC, cleartext TFTP and old SSH banners for verification"

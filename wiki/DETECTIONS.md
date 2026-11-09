@@ -55,7 +55,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 | POP3 USER/PASS or APOP is present | `pop3` | USER/PASS pairs and the APOP identity | critical | implemented |
 | SNMP v1/v2c traffic is present | `snmp` | community strings and version | high | implemented |
 | HTTP requests/responses carry authentication headers, cookies or token-shaped strings | `httptokens` | Bearer, Vault, GitLab, API-key, session cookies and JWT/GitHub/AWS/Slack/Stripe tokens; decodes JWT claims | critical | implemented |
-| Redis, MySQL or PostgreSQL traffic is present | `dbcreds` | Redis AUTH clear text, MySQL login salt/response as a MySQL CRAM hashcat 11200 line, PostgreSQL startup parameters plus clear-text or MD5 (hashcat 12) auth | critical | partial |
+| Redis, MySQL or PostgreSQL traffic is present | `dbcreds` | Redis AUTH clear text, MySQL login salt/response as a MySQL CRAM hashcat 11200 line, PostgreSQL startup parameters plus clear-text or MD5 (hashcat 12) auth, MSSQL SQL-auth username/password | critical | partial |
 | RDP negotiation or client data is present | `rdp` | requested protocols, negotiation type, and a DOMAIN\\user or user@domain from client data/routing cookie | medium | implemented |
 
 ### `ldap` — det.ldap
@@ -146,10 +146,10 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 **Mode:** passive  
 **Proves:** reusable database material or a crackable authentication response was sent  
-**Limits:** MSSQL stays with the NTLM handler; SCRAM exchanges expose only the mechanism  
+**Limits:** SCRAM exchanges expose only the mechanism; MSSQL Windows auth stays with the NTLM handler  
 **Output:** db-creds.tsv; leads DB-*  
 **Next:** reuse clear-text credentials (scope-gated) or crack the response offline  
-**Capture fields:** tcp.payload, mysql.user, mysql.passwd, mysql.salt, pgsql.parameter_name, pgsql.password, pgsql.authtype, pgsql.salt  
+**Capture fields:** tcp.payload, mysql.user, mysql.passwd, mysql.salt, pgsql.parameter_name, pgsql.password, pgsql.authtype, pgsql.salt, tds.login.username, tds.login.password  
 **Reference:** https://www.thehacker.recipes/infra/protocols/mssql
 
 ### `rdp` — det.rdp
@@ -316,8 +316,8 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 | HTTP requests look like Windows Update/WSUS | `wsus` | WSUS endpoints, hosts and indicators | medium | implemented |
 | DNS queries/answers are present | `dns` | query name, record type, A/AAAA/PTR answer; attaches names to host IPs | low | implemented |
 | DHCPv6, ICMPv6 router advertisements or DNS UPDATE are present | `ipv6` | offered DNS servers, RDNSS/DNSSL, and ADIDNS dynamic updates; one host doing both is critical | critical | implemented |
-| SIP or Cisco Skinny/SCCP signalling is present | `voip` | SIP methods (REGISTER/INVITE/MESSAGE), caller/callee, Call-ID, digest auth presence; Skinny call party metadata | medium | implemented |
-| SSH, TLS, VNC or TFTP traffic is present | `fingerprints` | SSH banners, TLS SNI and version, VNC protocol/security type, TFTP file names | medium | implemented |
+| SIP or Cisco Skinny/SCCP signalling is present | `voip` | SIP methods (REGISTER/INVITE/MESSAGE), caller/callee, Call-ID, digest auth presence and digest fields; Skinny call party metadata | medium | implemented |
+| SSH, TLS, VNC or TFTP traffic is present | `fingerprints` | SSH banners, TLS SNI and version, VNC protocol/security type, TFTP file names, SMB3 encryption capability/session | medium | implemented |
 
 ### `nac` — det.nac
 
@@ -361,7 +361,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 **Mode:** passive  
 **Proves:** call signalling was visible in clear text and which endpoints registered/called  
-**Limits:** media (RTP) is not decoded; TLS/SIPS is opaque; digest challenges are not cracked  
+**Limits:** media (RTP) is not decoded; TLS/SIPS is opaque; digest response is fingerprinted, not cracked  
 **Output:** voip.tsv; leads VOIP-*  
 **Next:** review the registrar/PBX exposure and the extension map  
 **Capture fields:** sip.Method, sip.from.user, sip.to.user, sip.Call-ID, sip.Authorization, skinny.CallingPartyNumber  
@@ -370,10 +370,10 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 **Mode:** passive  
 **Proves:** these services were exposed and which versions/encryption they offered  
-**Limits:** banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises  
+**Limits:** banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises; SMB3 encryption makes content opaque  
 **Output:** fingerprints.tsv; leads FP-*  
 **Next:** prioritise no-auth VNC, cleartext TFTP and old SSH banners for verification  
-**Capture fields:** ssh.protocol, tls.handshake.extensions_server_name, vnc.server_proto_ver, vnc.server_security_type, tftp.source_file  
+**Capture fields:** ssh.protocol, tls.handshake.extensions_server_name, vnc.server_proto_ver, vnc.server_security_type, tftp.source_file, smb2.ses_flags.encrypt  
 
 ## Files (2)
 

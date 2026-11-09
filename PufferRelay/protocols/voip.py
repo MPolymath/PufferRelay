@@ -7,9 +7,25 @@ present. Media (RTP) is not decoded.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 
 from PufferRelay.tshark_fields import fields
+
+DIGEST = re.compile(r'(\w+)\s*=\s*"?([^",]+)"?')
+
+
+def _parse_digest(value):
+    parsed = {}
+    for key, item in DIGEST.findall(value or ""):
+        parsed[key.lower()] = item.strip()
+    response = parsed.pop("response", "")
+    if response:
+        parsed["response_sha256"] = hashlib.sha256(
+            response.encode("utf-8", "replace")
+        ).hexdigest()[:12]
+    return parsed
 
 
 def _sip_pass(pcap_file):
@@ -34,9 +50,12 @@ def _sip_pass(pcap_file):
         if not method:
             continue
         authenticated = bool((auth or "").strip() or (proxy_auth or "").strip())
+        digest = _parse_digest(auth or proxy_auth)
         if method == "REGISTER" and authenticated:
             kind, severity = "sip-register-auth", "medium"
             detail = "SIP REGISTER with digest/proxy authentication"
+            if digest.get("response_sha256"):
+                detail += " (digest response captured for offline cracking)"
         elif method in {"INVITE", "MESSAGE", "SUBSCRIBE"}:
             kind, severity = "sip-call", "low"
             detail = f"SIP {method} signalling"
@@ -47,6 +66,7 @@ def _sip_pass(pcap_file):
             "call_id": call_id or "",
             "authenticated": authenticated,
             "user_agent": agent or "",
+            "digest": digest,
         }
         out.append(
             (

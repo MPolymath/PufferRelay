@@ -13,7 +13,7 @@ import re
 
 from PufferRelay.tshark_fields import fields
 
-FILTER = "tcp.port == 6379 || mysql || pgsql"
+FILTER = "tcp.port == 6379 || mysql || pgsql || tds.login"
 FIELDS = [
     "ip.src",
     "ip.dst",
@@ -28,6 +28,9 @@ FIELDS = [
     "pgsql.authtype",
     "pgsql.salt",
     "pgsql.auth.sasl.mech",
+    "tds.login.username",
+    "tds.login.password",
+    "tds.login.hostname",
 ]
 REDIS_AUTH = re.compile(r"(?i)\bAUTH\r?\n?\$\d+\r?\n([^\r\n]+)")
 REDIS_INLINE = re.compile(r"(?i)^\s*AUTH\s+(\S+)\s*$", re.M)
@@ -76,7 +79,7 @@ def process_database_auth(pcap_file):
         )
 
     for row in rows:
-        padded = tuple(row) + ("",) * (13 - len(row))
+        padded = tuple(row) + ("",) * (16 - len(row))
         (
             src,
             dst,
@@ -91,7 +94,10 @@ def process_database_auth(pcap_file):
             pg_auth,
             pg_salt,
             pg_mech,
-        ) = padded[:13]
+            tds_user,
+            tds_password,
+            tds_host,
+        ) = padded[:16]
         port = _port(port_text)
 
         if port == 6379:
@@ -146,5 +152,17 @@ def process_database_auth(pcap_file):
                     "pg-password", "", database)
         elif (pg_mech or "").upper().startswith("SCRAM"):
             add("postgres", src, dst, user, "", "pg-scram-mech", "", database)
+
+        if (tds_user or "").strip() and (tds_password or "").strip():
+            add(
+                "mssql",
+                src,
+                dst,
+                tds_user.strip(),
+                tds_password.strip(),
+                "mssql-sql-auth",
+                "",
+                tds_host.strip(),
+            )
 
     return out

@@ -44,7 +44,7 @@ pufferrelay -r --has-creds --json                   # ask the database
 | DCE/RPC binds/requests to EFSRPC, RPRN, DFSNM or FSRVP are present | `coercion` | coercions.tsv; leads COERCE-* | encrypted RPC is opaque; a bind or pipe without a UNC path is normal traffic and is ignored |
 | HTTP /certsrv enrollment, Kerberos PKINIT or MS-WCCE DCOM enrollment is present | `adcs` | adcs.tsv; leads ADCS-* | template attributes are usually not visible; enrollment success is not confirmed |
 | DHCPv6, ICMPv6 router advertisements or DNS UPDATE are present | `ipv6` | ipv6.tsv; leads IPV6-* | no baseline of the legitimate resolver; confirm before calling it rogue |
-| Redis, MySQL or PostgreSQL traffic is present | `dbcreds` | db-creds.tsv; leads DB-* | MSSQL stays with the NTLM handler; SCRAM exchanges expose only the mechanism |
+| Redis, MySQL or PostgreSQL traffic is present | `dbcreds` | db-creds.tsv; leads DB-* | SCRAM exchanges expose only the mechanism; MSSQL Windows auth stays with the NTLM handler |
 | SMB traffic carries file objects that tshark can reassemble | `smbobjects` | files.tsv, files/ | 8 MiB/object, 16 MiB/capture; SMB3 encryption and missing reassembly yield nothing |
 | SCCM management/distribution HTTP, SMS shares or site-server admin-share traffic is present | `sccm` | sccm.tsv; leads SCCM-* | SMS Provider DCOM and policy objects are not parsed |
 | HTTP traffic targets an LLM service, MCP endpoint or vector database | `llm` | llm.tsv; leads LLM-* | TLS is opaque; ambiguous ports are recognised only by path markers; prompts are not exported |
@@ -52,8 +52,8 @@ pufferrelay -r --has-creds --json                   # ask the database
 | LDAP search results contain sAMAccountName, objectSID or servicePrincipalName | `ldapdir` | ldap-spns.tsv; leads SPN-*; objectSID upgrades BloodHound identifiers | attribute/value pairing is positional and can be confused by commas or split entries |
 | RDP negotiation or client data is present | `rdp` | rdp.tsv; leads RDP-* | CredSSP passwords are encrypted; identity extraction depends on client data being visible |
 | Docker, Kubernetes, kubelet, etcd, Consul, Vault or Veeam ports carry HTTP | `cloudapi` | cloud-apis.tsv; leads CLOUD-* | TLS is opaque; only the request side is seen, and a 401 response cannot be distinguished from success |
-| SIP or Cisco Skinny/SCCP signalling is present | `voip` | voip.tsv; leads VOIP-* | media (RTP) is not decoded; TLS/SIPS is opaque; digest challenges are not cracked |
-| SSH, TLS, VNC or TFTP traffic is present | `fingerprints` | fingerprints.tsv; leads FP-* | banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises |
+| SIP or Cisco Skinny/SCCP signalling is present | `voip` | voip.tsv; leads VOIP-* | media (RTP) is not decoded; TLS/SIPS is opaque; digest response is fingerprinted, not cracked |
+| SSH, TLS, VNC or TFTP traffic is present | `fingerprints` | fingerprints.tsv; leads FP-* | banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises; SMB3 encryption makes content opaque |
 | LDAP search results contain pKIEnrollmentService or pKICertificateTemplate objects | `ldapadcs` | ldap-adcs.tsv; leads ADCSDIR-* | attribute/value pairing is positional; template ACLs and effective rights are not visible |
 | -q is used, or -f is combined with -q | `quickwins` | quick_wins table; leads QW-* | presence is not exploitability; signing may be enforced elsewhere |
 
