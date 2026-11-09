@@ -129,6 +129,7 @@ def test_write_exports_pack():
             "nmap-command.txt",
             "credentials.csv",
             "ntlm-hashes.txt",
+            "asrep-hashes.txt",
             "summary.json",
             "leads.json",
             "leads.md",

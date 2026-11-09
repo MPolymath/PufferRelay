@@ -27,7 +27,7 @@ from PufferRelay.core_imports import (
 from PufferRelay.config import DB_NAME
 
 # Current schema version - increment this when making schema changes
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 4
 
 def migrate_database(conn):
     """Bring an existing database up to CURRENT_SCHEMA_VERSION.

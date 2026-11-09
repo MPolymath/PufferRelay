@@ -30,6 +30,7 @@ from .imap_handler import process_imap
 from .pop3_handler import process_pop3
 from .snmp_handler import process_snmp
 from .services_handler import process_services
+from .kerberos_handler import process_kerberos
 
 __all__ = [
     'process_ldap',
@@ -43,5 +44,6 @@ __all__ = [
     'process_imap',
     'process_pop3',
     'process_snmp',
-    'process_services'
+    'process_services',
+    'process_kerberos'
 ]

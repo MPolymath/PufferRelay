@@ -165,6 +165,20 @@ def create_database(db_path=None):
             )
         """)
 
+        # Create AS-REP roasting candidates (issue #61)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS kerberos_asrep (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT,
+                realm TEXT,
+                etype TEXT,
+                hash TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                UNIQUE(username, realm, hash)
+            )
+        """)
+
         # Create observed services table (dst ip/port seen in the capture)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS observed_services (

@@ -131,6 +131,14 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} SNMP records")
+        elif protocol == "kerberos":
+            # (username, realm, etype, hash, src_ip, dst_ip)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO kerberos_asrep
+                    (username, realm, etype, hash, src_ip, dst_ip)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} AS-REP candidates")
         elif protocol == "services":
             # (ip, port, service, transport) observed in the capture
             cursor.executemany("""
@@ -193,6 +201,8 @@ PROTOCOL_TABLES = {
     "pop3": ("pop3_requests", ["source_ip", "destination_ip", "username", "password"]),
     "snmp": ("snmp_requests", ["source_ip", "destination_ip", "community_string"]),
     "services": ("observed_services", ["ip", "port", "service", "transport"]),
+    "kerberos": ("kerberos_asrep",
+                 ["username", "realm", "etype", "hash", "src_ip", "dst_ip"]),
     "ips": ("ip_requests", ["subnet", "ip"]),
 }
 

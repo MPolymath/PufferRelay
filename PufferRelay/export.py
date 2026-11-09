@@ -272,6 +272,21 @@ def collect_credentials(conn: sqlite3.Connection) -> List[Dict]:
 
 def collect_hashes(conn: sqlite3.Connection) -> List[Dict]:
     out = []
+    if _has_table(conn, "kerberos_asrep"):
+        for user, realm, etype, asrep, src, dst in _rows(
+            conn,
+            "SELECT username, realm, etype, hash, src_ip, dst_ip FROM kerberos_asrep",
+        ):
+            out.append(
+                {
+                    "username": f"{user}@{realm}",
+                    "hash": asrep or "",
+                    "source_ip": src or "",
+                    "destination_ip": dst or "",
+                    "kind": f"AS-REP (etype {etype or '23'})",
+                    "hashcat_mode": 18200,
+                }
+            )
     for src, dst, user, ntlm_hash in _rows(
         conn, "SELECT source_ip, destination_ip, username, ntlm_hash FROM ntlm_requests"
     ):
@@ -562,8 +577,45 @@ def build_leads(inventory: Dict) -> List[Dict]:
             }
         )
 
+    # 3a. AS-REP roastable accounts: a domain credential for offline cracking.
+    asrep_hashes = [h for h in hashes if h.get("hashcat_mode") == 18200]
+    for i, h in enumerate(asrep_hashes, start=1):
+        add(
+            {
+                "id": f"ASREP-{i:03d}",
+                "severity": "critical",
+                "title": f"AS-REP roastable account {h['username']}",
+                "why": "The KDC answered without pre-authentication, so the AS-REP "
+                "encrypted part can be cracked offline to a domain password.",
+                "evidence": {
+                    "principal": h["username"],
+                    "source_ip": h["source_ip"],
+                    "destination_ip": h["destination_ip"],
+                    "hash": h["hash"],
+                },
+                "suggested_actions": [
+                    {
+                        "intent": "Crack the AS-REP offline (no traffic to the target)",
+                        "command": "hashcat -m 18200 asrep-hashes.txt <wordlist> "
+                        "-r rules/best64.rule",
+                        "active": False,
+                        "warning": "Offline only; safe for the target network.",
+                    },
+                    {
+                        "intent": "Validate the cracked password against Kerberos (scope-gated)",
+                        "command": "nxc smb <dc> -u '<user>' -p '<password>'",
+                        "active": True,
+                        "warning": "Active: authenticates to the DC. Confirm scope and "
+                        "lockout policy.",
+                    },
+                ],
+            }
+        )
+
     # 3. NTLM hashes -> offline cracking (safe, no network).
     for i, h in enumerate(hashes, start=1):
+        if h.get("hashcat_mode") == 18200:
+            continue
         add(
             {
                 "id": f"HASH-{i:03d}",
@@ -862,7 +914,14 @@ def write_exports(
                 ]
             )
 
-    _write_text(path("ntlm-hashes.txt"), [h["hash"] for h in inventory["hashes"] if h["hash"]])
+    _write_text(
+        path("ntlm-hashes.txt"),
+        [h["hash"] for h in inventory["hashes"] if h["hash"] and h["hashcat_mode"] == 5600],
+    )
+    _write_text(
+        path("asrep-hashes.txt"),
+        [h["hash"] for h in inventory["hashes"] if h["hash"] and h["hashcat_mode"] == 18200],
+    )
 
     _write_json(path("summary.json"), {"inventory": inventory, "leads": leads})
     _write_json(

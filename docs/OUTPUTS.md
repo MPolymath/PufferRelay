@@ -67,6 +67,7 @@ Rules an agent must follow when consuming it:
 | `nmap-command.txt` | one ready `nmap -sV -Pn ...` line | copy-paste (ACTIVE) |
 | `credentials.csv` | `protocol,source_ip,destination_ip,username,secret,context` | reuse, reporting |
 | `ntlm-hashes.txt` | NetNTLM hashes | `hashcat -m 5600` |
+| `asrep-hashes.txt` | AS-REP roastable accounts | `hashcat -m 18200` |
 | `summary.json` | inventory + leads | dashboards, diffing runs |
 
 ## CLI filters (issue #48)

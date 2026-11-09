@@ -23,7 +23,8 @@ status board.
 
 ## Next (ROI order from PLAN.md)
 
-- [ ] #61 AS-REP roasting detection (Kerberos AS-REP -> hashcat).
+- [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
+      AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [ ] #62 relay scenario enumeration (SMB/LDAP signing + NTLM flows).
 - [ ] #44 SMB extraction (shares, files, users, signing).
 - [ ] #57 file carving from HTTP/SMB/FTP streams.
