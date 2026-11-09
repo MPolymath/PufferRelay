@@ -85,3 +85,21 @@ Status legend: `[ ]` to do · `[~]` in progress · `[x]` done.
 6. README + `docs/OUTPUTS.md` + progress notes.
 
 Everything else follows the table above; do Tier S completely before Tier A.
+
+## Progress log — 2026-11-09 (`dev-feature`)
+
+| Commit | What landed |
+|---|---|
+| `ad4cf9d` | AGENTS.md, this plan, export pack + `leads.json`/`leads.md`, CLI filters, observed services, schema v3, NetBIOS repair, tests, CI |
+| `e0376cf` | commit-message fix (no functional change) |
+| `ec690e9` | `-r --protocol` raw views; briefing hints when no quick-win scan exists |
+| `3b7101c` | `agent-prompt.md` (ready-to-paste agent instructions) |
+| `13e2726` | CLI subprocess test; UTF-8 stdio so redirected output does not crash |
+| `3f1a7d9` | #61 AS-REP roasting detection (hashcat 18200, `asrep-hashes.txt`, ASREP leads) |
+| `03ca4c9` | #62 relay scenarios (SMB2 signing flags + NTLM over SMB/LDAP/HTTP, `relay-targets.txt`, RELAY leads) |
+| `1b0d7c8` | relay signing findings feed the SMB_SIGNING_MISSING quick win |
+
+Test status: 26 pytest tests passing locally and in CI (tshark installed),
+including a synthetic-pcap end-to-end and a CLI subprocess test. Every feature
+above is passive; the only active commands are text suggestions in leads,
+flagged `active: true` with scope warnings.
