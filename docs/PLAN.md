@@ -112,8 +112,9 @@ Everything else follows the table above; do Tier S completely before Tier A.
 | (this commit) | ASRepCatcher-compatible detection (ARP + Kerberos relay shape) with repo link in every lead |
 | (next commit) | Kerberoasting, HTTP tokens, RPC coercion, ADCS/PKINIT, IPv6/DHCPv6/ADIDNS, database auth, SMB object carving (issues #64-#67, #69, #70) |
 | (this commit) | SCCM/MECM and LLM/MCP/vector-DB detection (issues #68, #71) — all eight library issues closed |
+| (wiki commit) | decision-first wiki: `wiki/detections.yaml` source of truth, generated `DETECTIONS.md`/`CHEATSHEET.md`, `intake.md`, `decision-guide.md`, generator + CI check |
 
-Test status: 107 pytest tests passing locally and in CI (tshark installed),
+Test status: 110 pytest tests passing locally and in CI (tshark installed),
 including synthetic-pcap end-to-end, CLI subprocess, loopback relay and
 live-capture command-construction tests. Passive analysis is the default;
 active modes (`--live`, `--proxy`) print a red warning and require explicit

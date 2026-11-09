@@ -1,5 +1,9 @@
 # Features
 
+The canonical, per-detection catalog (when it applies, what it proves, what it
+misses, output, next step) is **[DETECTIONS.md](DETECTIONS.md)**, generated from
+[detections.yaml](detections.yaml). This page is the summary.
+
 ## Extraction (passive)
 
 | Area | What you get |

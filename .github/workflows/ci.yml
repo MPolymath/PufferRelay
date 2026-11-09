@@ -31,3 +31,6 @@ jobs:
 
       - name: tests
         run: python -m pytest PufferRelay/tests -q
+
+      - name: wiki catalog is current
+        run: python scripts/build_wiki.py --check

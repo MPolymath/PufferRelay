@@ -1,5 +1,9 @@
 # Protocols: what is parsed and what it proves
 
+The canonical, machine-checked catalog is **[DETECTIONS.md](DETECTIONS.md)**
+(generated from [detections.yaml](detections.yaml)); this page keeps the prose
+detail per protocol.
+
 Each handler reads only fields from the capture. "Proves" is deliberately
 narrow: a capture proves traffic, not intent.
 

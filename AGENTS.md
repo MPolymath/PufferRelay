@@ -126,8 +126,8 @@ Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->
   generated (scapy) or a fixture exists.
 - A handler without a fixture gets a unit test on its parsing helper, not a
   "tested by hand" claim.
-- CI (`.github/workflows/ci.yml`) runs `pytest` + `black --check` +
-  `python -m compileall`.
+- CI (`.github/workflows/ci.yml`) runs `pytest`, `compileall` and
+  `python scripts/build_wiki.py --check`.
 - Never commit pcaps > a few hundred KB; generate them in tests.
 
 ## 6. Definition of done (per feature)
@@ -136,22 +136,42 @@ Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->
 2. Data stored (new table or column) with `INSERT OR IGNORE` semantics.
 3. Export (file + copy-paste block) produced.
 4. `pytest` tests pass; CI green.
-5. README + `docs/OUTPUTS.md` + `docs/PLAN.md` status updated.
+5. `wiki/detections.yaml` entry added/updated, `python scripts/build_wiki.py`
+   run (it regenerates `DETECTIONS.md` + `CHEATSHEET.md`), plus README,
+   `docs/OUTPUTS.md` and `docs/PLAN.md` status.
 6. If it touches the network: Tier B rules from §2 are followed.
 
-## 7. Known defects to fix before adding features
+## 7. Wiki knowledge (source of truth)
 
-- `db_models.py` creates `netbios_requests` with `(domain_workgroup, hostname,
-  ip, mac)` but `insert_into_database()` inserts `(domain_workgroup, hostname,
-  other_service, src_ip, src_mac, service_type)` -> `sqlite3.OperationalError`,
-  NetBIOS findings are lost. Align schema + insert + handler tuple.
-- `ip_handler.process_ips()` opens with `debug=True`, `include_raw=True`,
-  `use_json=True` -> console noise and slow parsing (#52/#55).
-- `db_version.py` mixes `PRAGMA user_version` with a `schema_version` table;
-  unify (one source of truth) and make the failure message actionable (#38).
-- `tests/*.py` are empty files; nothing is actually tested (#43).
-- `quick_wins.py` scans every packet with regexes (slow on big pcaps, #55);
-  move to targeted filters/fields per protocol.
+- `wiki/detections.yaml` is the only place detection knowledge is added. One
+  entry per handler (active modes and quick wins are separate entries); the
+  generator fails on missing/duplicate/unknown handlers.
+- Required fields: `id, class, handler, mode, when, detects, proves, limits,
+  fields, output, severity, next, status`. `proves` and `limits` are distinct
+  and mandatory; a candidate-only detection uses `status: partial`.
+- Run `python scripts/build_wiki.py` after editing. Never hand-edit
+  `wiki/DETECTIONS.md` or `wiki/CHEATSHEET.md`; CI runs `--check` and fails on
+  stale pages.
+- `when` must be observable in a capture; `output` must name the real file and
+  lead prefix from `export.py`; active entries must state warning/authorization.
+- Add a `references` URL when the technique came from an article (the
+  attack-library repo is the source list). Read `wiki/intake.md` first.
+- Rule of thumb: if a detection cannot say what it proves and what it misses,
+  it is not ready to be in the tool.
+
+## 8. Known gaps
+
+- A default full run starts one tshark process per handler (29 passive + quick
+  wins); `--only`/`--credentials-only` are the lever on large captures.
+- ADCS DCOM-only enrollment, SCCM provider DCOM, MySQL native/SCRAM hash modes
+  and encrypted SMB3 are not fully parsed; their catalog entries are `partial`.
+- CI runs on Linux with the distro tshark only; Windows/macOS tshark versions
+  are not in the matrix.
+- BloodHound export is Legacy JSON built from observed identities; CE-specific
+  refinements (typed edges, SIDs) are future work.
+- Issue #51 (local Ollama triage of HTTP findings) is not implemented; `llm`
+  detection is metadata-only and never calls a model.
+- Media (#23/#24) and VoIP (#17) extraction remain backlog items.
 - `--read` with no `-f` still creates the DB in cwd; document/guard.
 
 ## 8. Documentation surfaces

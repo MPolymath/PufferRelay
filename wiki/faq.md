@@ -35,6 +35,37 @@ directions to JSONL, with the same warning and confirmation. `--commands` and
 `--serveme` only *write text* (`active-commands.md`, `serveme.md`); nothing is
 executed. Every generated line is marked ACTIVE and includes cleanup advice.
 
+**Where do I start?**
+[CHEATSHEET.md](CHEATSHEET.md) for the one-page card, then
+[decision-guide.md](decision-guide.md) for the triage trees. The per-detection
+detail is [DETECTIONS.md](DETECTIONS.md).
+
+**Why is a Kerberoast row a candidate but has no hash?**
+The TGS-REP was seen but the reassembled DER did not parse to the Ticket
+enc-part (segmentation, encryption, or a non-DER blob). The candidate still
+shows the request; treat it as a lead, not a hash.
+
+**Why did no coercion finding appear?**
+The detector requires an actual UNC path in an EFSRPC/RPRN/DFSNM/FSRVP call.
+A bind or pipe alone is normal traffic (printing, DFS, LSA) and is ignored.
+Encrypted RPC cannot be inspected.
+
+**Are tokens written to disk?**
+The full token is stored in the local SQLite database. `tokens.tsv`, the leads
+and the agent feed only carry a fingerprint (first/last characters). Treat the
+database as a secret and delete it with the other artifacts.
+
+**How do I add or change a detection?**
+Edit `wiki/detections.yaml` and read [intake.md](intake.md); then run
+`python scripts/build_wiki.py`. The generator validates fields, checks that
+every registered handler is covered, and regenerates `DETECTIONS.md` and
+`CHEATSHEET.md`. CI runs `--check`.
+
+**Why does a full run start so many tshark processes?**
+Each handler is one field-extraction pass. With the extended detections the
+registry is large; use `--only` or `--credentials-only` when you do not need
+everything (see [performance.md](performance.md)).
+
 **Where is the database?**
 By default `extracted_data.db` in the working directory. Use `--db PATH` or
 `db_path` in the config file to keep it with the engagement; delete it with the

@@ -53,6 +53,9 @@ Issue bodies: `../attack-library/pufferrelay-issues/` (filed as #64-#71).
       metadata (`llm.tsv`, `LLM-*`).
 - [x] #57 extension: SMB object carving via tshark `--export-objects`, feeding
       `captured_files` with sha256 and size caps.
+- [x] Wiki restructure: `wiki/detections.yaml` is the source of truth; the
+      catalog and cheatsheet are generated and CI-checked; `intake.md` and
+      `decision-guide.md` complete the decision-first wiki.
 - [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM

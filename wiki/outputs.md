@@ -17,12 +17,23 @@ pufferrelay -f capture.pcapng -q --dump out
 | `agent-prompt.md` | prompt to paste into an AI agent with the pack |
 | `ips.txt`, `subnets.txt`, `hosts.tsv` | network map |
 | `users.txt` | spraying/roasting candidates |
-| `credentials.csv`, `ntlm-hashes.txt`, `asrep-hashes.txt` | secrets for reuse/cracking |
-| `relay-targets.txt`, `relays.tsv`, `smb-shares.txt`, `smb-files.txt` | lateral movement leads |
-| `wsus.txt`, `nac.txt` | update infrastructure and 802.1X/MAB observations |
+| `credentials.csv`, `ntlm-hashes.txt`, `asrep-hashes.txt`, `kerberoast-hashes.txt` | secrets for reuse/cracking |
+| `tokens.tsv` | HTTP bearer/JWT/API token inventory (fingerprints; raw values stay in the DB) |
+| `db-creds.tsv` | Redis/MySQL/PostgreSQL credentials and authentication responses |
+| `relay-targets.txt`, `relays.tsv`, `coercions.tsv`, `adcs.tsv`, `sccm.tsv` | lateral movement / AD escalation leads |
+| `asrepcatcher.txt` | ASRepCatcher-compatible ARP/Kerberos pattern (links the upstream repo) |
+| `wsus.txt`, `nac.txt`, `dns.txt`, `ipv6.tsv` | update infrastructure, 802.1X/MAB, name map, DHCPv6/RA/ADIDNS |
+| `llm.tsv` | LLM/MCP/vector-DB endpoints and tool calls (metadata only) |
 | `files.tsv` + `files/` | carved objects (client data — local only) |
 | `bloodhound/` | Legacy JSON graph (users/computers/sessions) |
 | `summary.json` | inventory + leads for dashboards |
+
+## Lead prefixes
+
+`CRED`, `HASH`, `ASREP`, `KERBEROAST`/`KERBEROASTCAND`, `TOKEN`, `RELAY`,
+`COERCE`, `ADCS`, `SCCM`, `IPV6`, `DB`, `LLM`, `SMB`, `SMBFILE`, `FILE`,
+`NAC`, `WSUS`, `ASREPCATCHER`, `QW`. Each lead's `evidence` names the source
+file/row; the agent feed never needs to re-parse the database.
 
 ## Lead shape
 

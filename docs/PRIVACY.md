@@ -26,6 +26,22 @@ derived from it — as **client confidential material**.
    working area only for the duration of the test and remove them afterwards if
    the engagement rules require it.
 
+## Secrets the tool now stores
+
+- **HTTP tokens**: the raw bearer/JWT/API value is written to the local SQLite
+  database; `tokens.tsv`, `leads.json` and `leads.md` carry only a fingerprint.
+  The database is therefore a secret, not metadata.
+- **Kerberos hashes** (`asrep-hashes.txt`, `kerberoast-hashes.txt`) and
+  **NTLM hashes** are live credentials for offline cracking; they are never
+  logged and never belong in a ticket or chat.
+- **Database credentials** (`db-creds.tsv`, `credentials.csv`) contain reusable
+  passwords and authentication responses.
+- **Carved files and SMB objects** (`files/`) are the client's content.
+- **LLM/MCP metadata** (`llm.tsv`) records endpoints, model names and tool
+  names; prompts and answers are not exported by default.
+- The whole `--dump` directory is one confidential artifact. Delete the
+  database and exports with the capture when the engagement rules require it.
+
 ## How to test a feature against a real capture safely
 
 ```bash
