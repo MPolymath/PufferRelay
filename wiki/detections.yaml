@@ -220,9 +220,9 @@
   when: "EAPOL/EAP or RADIUS frames are present"
   detects: "802.1X/MAB identities, authenticator and method"
   proves: "port authentication is in use and which identities authenticate"
-  limits: "no keys; spoof proposals are Tier B and not generated here"
+  limits: "no keys; spoof proposals are text-only and appear in active-commands.md"
   fields: "eapol, eap, radius User-Name"
-  output: "nac.txt; leads NAC-*"
+  output: "nac.txt; leads NAC-*; --commands adds text-only 802.1X/MAB proposals"
   severity: low
   next: "decide whether the port is defended before any active test"
   references: ""
@@ -352,11 +352,11 @@
   class: ad
   handler: adcs
   mode: passive
-  when: "HTTP /certsrv enrollment or Kerberos PKINIT is present"
-  detects: "certificate enrollment requests (NTLM flagged high) and PKINIT AS-REQ with its principal"
+  when: "HTTP /certsrv enrollment, Kerberos PKINIT or MS-WCCE DCOM enrollment is present"
+  detects: "HTTP enrollment (NTLM flagged high), PKINIT AS-REQ, and DCOM binds to ICertRequestD/D2/ICertAdminD2"
   proves: "certificate enrollment or certificate logon was observed"
-  limits: "template attributes are usually not visible; DCOM-only enrollment is not fully parsed"
-  fields: "http.request.uri, http.authorization, kerberos.padata_type"
+  limits: "template attributes are usually not visible; enrollment success is not confirmed"
+  fields: "http.request.uri, http.authorization, kerberos.padata_type, dcerpc.cn_bind_to_uuid"
   output: "adcs.tsv; leads ADCS-*"
   severity: high
   next: "review the CA/template and whether the enrolling host should be able to do this"
@@ -383,10 +383,10 @@
   handler: dbcreds
   mode: passive
   when: "Redis, MySQL or PostgreSQL traffic is present"
-  detects: "Redis AUTH clear text, MySQL login username/response, PostgreSQL startup parameters and clear-text/MD5/SASL auth"
+  detects: "Redis AUTH clear text, MySQL login salt/response as a MySQL CRAM hashcat 11200 line, PostgreSQL startup parameters plus clear-text or MD5 (hashcat 12) auth"
   proves: "reusable database material or a crackable authentication response was sent"
-  limits: "MSSQL stays with the NTLM handler; SCRAM/native responses need the matching hashcat mode"
-  fields: "tcp.payload, mysql.user, mysql.passwd, pgsql.parameter_name, pgsql.password, pgsql.authtype"
+  limits: "MSSQL stays with the NTLM handler; SCRAM exchanges expose only the mechanism"
+  fields: "tcp.payload, mysql.user, mysql.passwd, mysql.salt, pgsql.parameter_name, pgsql.password, pgsql.authtype, pgsql.salt"
   output: "db-creds.tsv; leads DB-*"
   severity: critical
   next: "reuse clear-text credentials (scope-gated) or crack the response offline"
@@ -412,10 +412,10 @@
   class: ad
   handler: sccm
   mode: passive
-  when: "SCCM management/distribution HTTP or SMS shares are present"
-  detects: "management point, distribution point, site/package shares and authentication state"
-  proves: "SCCM management traffic was observed; NTLM to a management point is a relay candidate"
-  limits: "SMS Provider DCOM and policy objects are not parsed; package delivery alone is inventory"
+  when: "SCCM management/distribution HTTP, SMS shares or site-server admin-share traffic is present"
+  detects: "management point, distribution point, site/package shares, and client-push SMB from an observed MP to ADMIN$/C$"
+  proves: "SCCM management traffic was observed; NTLM to an MP or a push to an admin share is a relay/lateral path"
+  limits: "SMS Provider DCOM and policy objects are not parsed"
   fields: "http.request.uri, http.host, http.authorization, smb2.tree"
   output: "sccm.tsv; leads SCCM-*"
   severity: high
@@ -466,6 +466,36 @@
   severity: medium
   next: "join the SPN with the Kerberoast hash/lead for the same service"
   references: "https://www.thehacker.recipes/ad/recon/ldap"
+  status: partial
+
+- id: det.rdp
+  class: credentials
+  handler: rdp
+  mode: passive
+  when: "RDP negotiation or client data is present"
+  detects: "requested protocols, negotiation type, and a DOMAIN\\user or user@domain from client data/routing cookie"
+  proves: "RDP was offered/used and, when present, the account that connected"
+  limits: "CredSSP passwords are encrypted; identity extraction depends on client data being visible"
+  fields: "rdp.neg_type, rdp.negReq.requestedProtocols, rdp.clientData, rdp.rt_cookie"
+  output: "rdp.tsv; leads RDP-*"
+  severity: medium
+  next: "review the host exposure and the account for interactive access"
+  references: ""
+  status: implemented
+
+- id: det.cloudapi
+  class: cloud
+  handler: cloudapi
+  mode: passive
+  when: "Docker, Kubernetes, kubelet, etcd, Consul, Vault or Veeam ports carry HTTP"
+  detects: "sensitive API paths requested with or without an auth header"
+  proves: "an infrastructure API was reachable; without auth it is a direct control-plane path"
+  limits: "TLS is opaque; only the request side is seen, and a 401 response cannot be distinguished from success"
+  fields: "tcp.dstport, http.request.uri, http.host, tcp.payload"
+  output: "cloud-apis.tsv; leads CLOUD-*"
+  severity: critical
+  next: "verify the endpoint with a read-only request (ACTIVE; scope-gated)"
+  references: "https://www.thehacker.recipes/infra/protocols/"
   status: partial
 
 - id: det.voip

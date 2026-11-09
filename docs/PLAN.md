@@ -114,8 +114,9 @@ Everything else follows the table above; do Tier S completely before Tier A.
 | (this commit) | SCCM/MECM and LLM/MCP/vector-DB detection (issues #68, #71) — all eight library issues closed |
 | (wiki commit) | decision-first wiki: `wiki/detections.yaml` source of truth, generated `DETECTIONS.md`/`CHEATSHEET.md`, `intake.md`, `decision-guide.md`, generator + CI check |
 | (ten-step commit) | Kerberos depth (S4U/delegation/UnPAC), LDAP SPN/SID + signing inference, chain correlation, BloodHound SIDs, confidence + benign corpus, shared Kerberos pass + benchmark, report generator, loopback Ollama triage, VoIP/media/GitBook config |
+| (second ten-step commit) | ADCS DCOM + SCCM client-push, DB hash formats, hardened chains, CI matrix, `--auto` profile, report HTML/diff, RDP/cloud APIs/WPAD, NAC proposals |
 
-Test status: 124 pytest tests passing locally and in CI (tshark installed),
+Test status: 134 pytest tests passing locally and in CI (Linux/Windows/macOS),
 including synthetic-pcap end-to-end, CLI subprocess, loopback relay and
 live-capture command-construction tests. Passive analysis is the default;
 active modes (`--live`, `--proxy`) print a red warning and require explicit

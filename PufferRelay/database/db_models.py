@@ -415,6 +415,20 @@ def create_database(db_path=None):
             )
         """)
         cursor.execute("""
+            CREATE TABLE IF NOT EXISTS service_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                protocol TEXT,
+                kind TEXT,
+                severity TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                principal TEXT,
+                detail TEXT,
+                evidence TEXT,
+                UNIQUE(protocol, kind, src_ip, dst_ip, principal, detail)
+            )
+        """)
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS database_creds (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 protocol TEXT,
@@ -425,6 +439,7 @@ def create_database(db_path=None):
                 kind TEXT,
                 fingerprint TEXT,
                 server TEXT,
+                hashcat TEXT,
                 UNIQUE(protocol, src_ip, dst_ip, username, fingerprint)
             )
         """)

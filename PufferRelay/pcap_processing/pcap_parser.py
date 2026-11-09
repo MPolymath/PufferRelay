@@ -51,6 +51,8 @@ from PufferRelay.protocols import (
     process_kerberos_depth,
     process_ldap_directory,
     process_voip,
+    process_rdp,
+    process_cloudapi,
 )
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
@@ -91,6 +93,8 @@ HANDLERS = {
     "kerberosdepth": process_kerberos_depth,
     "ldapdir": process_ldap_directory,
     "voip": process_voip,
+    "rdp": process_rdp,
+    "cloudapi": process_cloudapi,
     "services": process_services,
     "ips": process_ips,
 }
@@ -99,7 +103,7 @@ HANDLERS = {
 CREDENTIAL_HANDLERS = {"ldap", "http", "ftp", "telnet", "smtp", "imap", "pop3", "ntlm",
                        "kerberos", "relays", "smb", "files", "nac", "httptokens",
                        "dbcreds", "kerberoast", "asrepcatcher", "smbobjects",
-                       "kerberosdepth", "ldapdir"}
+                       "kerberosdepth", "ldapdir", "rdp"}
 
 
 def selected_handlers(only=None, credentials_only=False):

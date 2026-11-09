@@ -75,7 +75,9 @@ pufferrelay -r --json
 | `--live IFACE --bpf FILTER` | **ACTIVE** live capture, analysed then deleted |
 | `--proxy --proxy-target HOST:PORT` | **ACTIVE** local TCP relay, JSONL recording |
 | `--commands` / `--serveme` | text-only command generators (nothing executed) |
-| `--report [FILE]` | Markdown engagement report (default `output_dir/report.md`) |
+| `--auto` | profile the capture's services and run only the relevant handlers |
+| `--report [FILE]` | Markdown or HTML engagement report (default `output_dir/report.md`) |
+| `--diff DB` | compare with another database and write `diff.md` |
 | `--triage` | rank leads with a **loopback-only** Ollama model (off by default) |
 | `--config FILE` / `--db PATH` | JSON config file and database override |
 

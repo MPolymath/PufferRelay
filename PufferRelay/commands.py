@@ -52,6 +52,61 @@ def _guess_gateway(hosts):
     return "<GATEWAY>"
 
 
+def nac_spoof_plan(inventory, interface="eth0"):
+    """Text-only 802.1X/MAB proposals derived from passive NAC observations."""
+    rows = inventory.get("nac") or []
+    if not rows:
+        return None
+    identities = sorted(
+        {
+            row.get("identity")
+            for row in rows
+            if row.get("identity") and row.get("identity") != "N/A"
+        }
+    )
+    authenticators = sorted(
+        {row.get("dst") for row in rows if row.get("dst")}
+    )
+    return {
+        "identity_count": len(identities),
+        "authenticator_count": len(authenticators),
+        "commands": [
+            {
+                "tool": "eaphammer",
+                "command": (
+                    f"sudo eaphammer -i {interface} --auth wpa-eap "
+                    "--identity <identity> --cert-wizard"
+                ),
+                "risk": "rogue authenticator; clients will connect to it",
+            },
+            {
+                "tool": "hostapd-mana",
+                "command": f"sudo hostapd-mana /etc/hostapd-mana.conf  # interface {interface}",
+                "risk": "evil-twin/EAP relay; can capture MSCHAPv2",
+            },
+            {
+                "tool": "MAB clone",
+                "command": (
+                    f"sudo macchanger -m <observed-mac> {interface} && "
+                    f"sudo ip addr add <observed-ip>/24 dev {interface}"
+                ),
+                "risk": "impersonates a MAB device; the port may lock out",
+            },
+        ],
+        "cleanup": [
+            "sudo pkill hostapd",
+            "sudo pkill eaphammer",
+            f"sudo macchanger -p {interface}",
+            "# remove any temporary IP address you added",
+        ],
+        "notes": [
+            f"{len(identities)} identity(ies) and {len(authenticators)} "
+            "authenticator(s) were observed; confirm the port profile before testing.",
+            "Keep the test to one authenticator at a time and restore the port after.",
+        ],
+    }
+
+
 def arp_spoof_plan(inventory, interface="eth0", gateway=None):
     """Return a reviewable ARP/relay plan derived from the inventory.
 
@@ -112,6 +167,7 @@ def arp_spoof_plan(inventory, interface="eth0", gateway=None):
         "targets": targets,
         "commands": commands,
         "relay_commands": relay_commands,
+        "nac": nac_spoof_plan(inventory, interface=interface),
         "cleanup": [
             "sudo pkill arpspoof",
             "sudo pkill ettercap",
@@ -157,6 +213,27 @@ def render_arp_plan(plan):
     lines.extend(plan["cleanup"])
     lines.append("```")
     lines.append("")
+    nac = plan.get("nac")
+    if nac:
+        lines.append("## NAC / 802.1X proposals (issue #30)")
+        lines.append("")
+        lines.append(
+            "Passive observations: "
+            f"{nac['identity_count']} identity(ies), "
+            f"{nac['authenticator_count']} authenticator(s)."
+        )
+        lines.append("")
+        for item in nac["commands"]:
+            lines.append(f"* {item['tool']}: `{item['command']}` — {item['risk']}")
+        lines.append("")
+        lines.append("Cleanup:")
+        lines.append("")
+        lines.append("```bash")
+        lines.extend(nac["cleanup"])
+        lines.append("```")
+        lines.append("")
+        lines.extend(f"* {note}" for note in nac["notes"])
+        lines.append("")
     lines.append("## Notes")
     lines.append("")
     lines.extend(f"* {note}" for note in plan["notes"])

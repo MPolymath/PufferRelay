@@ -5,7 +5,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 > Detection is not exploitation. A passive finding says what crossed the wire; verify before acting, and respect the scope.
 
-37 entries: 33 passive, 4 active.
+39 entries: 35 passive, 4 active.
 
 ## Inventory (3)
 
@@ -42,7 +42,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Next:** scope the engagement around the observed subnets  
 **Capture fields:** ip.src, ip.dst  
 
-## Credentials (10)
+## Credentials (11)
 
 | When | Handler | Detects | Severity | Status |
 |---|---|---|---|---|
@@ -55,7 +55,8 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 | POP3 USER/PASS or APOP is present | `pop3` | USER/PASS pairs and the APOP identity | critical | implemented |
 | SNMP v1/v2c traffic is present | `snmp` | community strings and version | high | implemented |
 | HTTP requests/responses carry authentication headers, cookies or token-shaped strings | `httptokens` | Bearer, Vault, GitLab, API-key, session cookies and JWT/GitHub/AWS/Slack/Stripe tokens; decodes JWT claims | critical | implemented |
-| Redis, MySQL or PostgreSQL traffic is present | `dbcreds` | Redis AUTH clear text, MySQL login username/response, PostgreSQL startup parameters and clear-text/MD5/SASL auth | critical | partial |
+| Redis, MySQL or PostgreSQL traffic is present | `dbcreds` | Redis AUTH clear text, MySQL login salt/response as a MySQL CRAM hashcat 11200 line, PostgreSQL startup parameters plus clear-text or MD5 (hashcat 12) auth | critical | partial |
+| RDP negotiation or client data is present | `rdp` | requested protocols, negotiation type, and a DOMAIN\\user or user@domain from client data/routing cookie | medium | implemented |
 
 ### `ldap` — det.ldap
 
@@ -145,11 +146,20 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 **Mode:** passive  
 **Proves:** reusable database material or a crackable authentication response was sent  
-**Limits:** MSSQL stays with the NTLM handler; SCRAM/native responses need the matching hashcat mode  
+**Limits:** MSSQL stays with the NTLM handler; SCRAM exchanges expose only the mechanism  
 **Output:** db-creds.tsv; leads DB-*  
 **Next:** reuse clear-text credentials (scope-gated) or crack the response offline  
-**Capture fields:** tcp.payload, mysql.user, mysql.passwd, pgsql.parameter_name, pgsql.password, pgsql.authtype  
+**Capture fields:** tcp.payload, mysql.user, mysql.passwd, mysql.salt, pgsql.parameter_name, pgsql.password, pgsql.authtype, pgsql.salt  
 **Reference:** https://www.thehacker.recipes/infra/protocols/mssql
+
+### `rdp` — det.rdp
+
+**Mode:** passive  
+**Proves:** RDP was offered/used and, when present, the account that connected  
+**Limits:** CredSSP passwords are encrypted; identity extraction depends on client data being visible  
+**Output:** rdp.tsv; leads RDP-*  
+**Next:** review the host exposure and the account for interactive access  
+**Capture fields:** rdp.neg_type, rdp.negReq.requestedProtocols, rdp.clientData, rdp.rt_cookie  
 
 ## Hashes (2)
 
@@ -213,8 +223,8 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 | SMB tree connects, creates or reads are present | `smb` | shares, file names, printer shares and SMB-signing state | medium | implemented |
 | Kerberos and ARP frames can be correlated | `asrepcatcher` | relayed AS-REQ from two sources, an AS-REP diverted to a host that did not ask, one IP announced by two MACs, pre-auth-less bursts | critical | partial |
 | DCE/RPC binds/requests to EFSRPC, RPRN, DFSNM or FSRVP are present | `coercion` | the coercion interface/pipe and the UNC path from the call data | high | partial |
-| HTTP /certsrv enrollment or Kerberos PKINIT is present | `adcs` | certificate enrollment requests (NTLM flagged high) and PKINIT AS-REQ with its principal | high | partial |
-| SCCM management/distribution HTTP or SMS shares are present | `sccm` | management point, distribution point, site/package shares and authentication state | high | partial |
+| HTTP /certsrv enrollment, Kerberos PKINIT or MS-WCCE DCOM enrollment is present | `adcs` | HTTP enrollment (NTLM flagged high), PKINIT AS-REQ, and DCOM binds to ICertRequestD/D2/ICertAdminD2 | high | partial |
+| SCCM management/distribution HTTP, SMS shares or site-server admin-share traffic is present | `sccm` | management point, distribution point, site/package shares, and client-push SMB from an observed MP to ADMIN$/C$ | high | partial |
 | LDAP search results contain sAMAccountName, objectSID or servicePrincipalName | `ldapdir` | SPN-to-account mapping and objectSID when the directory response is captured | medium | partial |
 
 ### `relays` — det.relays
@@ -261,17 +271,17 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 **Mode:** passive  
 **Proves:** certificate enrollment or certificate logon was observed  
-**Limits:** template attributes are usually not visible; DCOM-only enrollment is not fully parsed  
+**Limits:** template attributes are usually not visible; enrollment success is not confirmed  
 **Output:** adcs.tsv; leads ADCS-*  
 **Next:** review the CA/template and whether the enrolling host should be able to do this  
-**Capture fields:** http.request.uri, http.authorization, kerberos.padata_type  
+**Capture fields:** http.request.uri, http.authorization, kerberos.padata_type, dcerpc.cn_bind_to_uuid  
 **Reference:** https://www.thehacker.recipes/ad/movement/adcs/
 
 ### `sccm` — det.sccm
 
 **Mode:** passive  
-**Proves:** SCCM management traffic was observed; NTLM to a management point is a relay candidate  
-**Limits:** SMS Provider DCOM and policy objects are not parsed; package delivery alone is inventory  
+**Proves:** SCCM management traffic was observed; NTLM to an MP or a push to an admin share is a relay/lateral path  
+**Limits:** SMS Provider DCOM and policy objects are not parsed  
 **Output:** sccm.tsv; leads SCCM-*  
 **Next:** review the endpoint and authentication; correlate with relay findings  
 **Capture fields:** http.request.uri, http.host, http.authorization, smb2.tree  
@@ -301,8 +311,8 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 **Mode:** passive  
 **Proves:** port authentication is in use and which identities authenticate  
-**Limits:** no keys; spoof proposals are Tier B and not generated here  
-**Output:** nac.txt; leads NAC-*  
+**Limits:** no keys; spoof proposals are text-only and appear in active-commands.md  
+**Output:** nac.txt; leads NAC-*; --commands adds text-only 802.1X/MAB proposals  
 **Next:** decide whether the port is defended before any active test  
 **Capture fields:** eapol, eap, radius User-Name  
 
@@ -386,6 +396,22 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Next:** confirm the weak setting from the operator host (ACTIVE, scope-gated)  
 **Capture fields:** one tshark pass over the quick-win fields  
 **Reference:** https://www.thehacker.recipes/ad/movement/mitm-and-coerced-authentications/llmnr-nbtns-mdns-spoofing
+
+## Cloud (1)
+
+| When | Handler | Detects | Severity | Status |
+|---|---|---|---|---|
+| Docker, Kubernetes, kubelet, etcd, Consul, Vault or Veeam ports carry HTTP | `cloudapi` | sensitive API paths requested with or without an auth header | critical | partial |
+
+### `cloudapi` — det.cloudapi
+
+**Mode:** passive  
+**Proves:** an infrastructure API was reachable; without auth it is a direct control-plane path  
+**Limits:** TLS is opaque; only the request side is seen, and a 401 response cannot be distinguished from success  
+**Output:** cloud-apis.tsv; leads CLOUD-*  
+**Next:** verify the endpoint with a read-only request (ACTIVE; scope-gated)  
+**Capture fields:** tcp.dstport, http.request.uri, http.host, tcp.payload  
+**Reference:** https://www.thehacker.recipes/infra/protocols/
 
 ## Ai (1)
 

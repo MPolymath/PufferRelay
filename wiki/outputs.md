@@ -26,7 +26,8 @@ pufferrelay -f capture.pcapng -q --dump out
 | `llm.tsv` | LLM/MCP/vector-DB endpoints and tool calls (metadata only) |
 | `kerberos-signals.tsv`, `ldap-spns.tsv`, `ldap-signing.tsv` | delegation/UnPAC signals, SPN→account/SID, signing inference |
 | `voip.tsv`, `media.tsv` | SIP/Skinny call metadata; audio/video objects already carved |
-| `report.md`, `triage.md` | engagement report; optional localhost-LLM ranking |
+| `rdp.tsv`, `cloud-apis.tsv` | RDP identity/negotiation; exposed infra APIs (Docker/K8s/Vault/...) |
+| `report.md` / `report.html`, `diff.md`, `triage.md` | engagement report (Markdown or HTML), two-capture delta, optional localhost-LLM ranking |
 | `files.tsv` + `files/` | carved objects (client data — local only) |
 | `bloodhound/` | Legacy JSON graph (users/computers/sessions) |
 | `summary.json` | inventory + leads for dashboards |

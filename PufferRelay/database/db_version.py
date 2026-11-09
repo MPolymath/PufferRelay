@@ -27,7 +27,7 @@ from PufferRelay.core_imports import (
 from PufferRelay.config import get_db_name
 
 # Current schema version - increment this when making schema changes
-CURRENT_SCHEMA_VERSION = 15
+CURRENT_SCHEMA_VERSION = 16
 
 def migrate_database(conn):
     """Bring an existing database up to CURRENT_SCHEMA_VERSION.
@@ -75,6 +75,12 @@ def migrate_database(conn):
                     cursor.execute(f"ALTER TABLE quick_wins ADD COLUMN {column}")
                 except sqlite3.Error:
                     pass  # table absent (fresh DB) or column already there
+
+        if version < 16:
+            try:
+                cursor.execute("ALTER TABLE database_creds ADD COLUMN hashcat TEXT")
+            except sqlite3.Error:
+                pass  # fresh DB gets it from CREATE TABLE, or it already exists
 
         cursor.execute("PRAGMA user_version = %d" % CURRENT_SCHEMA_VERSION)
         try:

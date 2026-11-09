@@ -17,6 +17,11 @@ ADCS_FILTER = (
     '|| http.request.uri contains "certfnsh" '
     '|| http.request.uri contains "certnew")'
 )
+WCCE_UUIDS = {
+    "d99dfb68-8f8a-11d0-b881-00c04fc9b5a1": "ICertRequestD",
+    "5422fd3a-d4b4-4cef-a72d-3f0f3d5c1c9d": "ICertRequestD2",
+    "7fe0d935-dda6-443f-85d0-1cfb58fe41dd": "ICertAdminD2",
+}
 
 
 def _http_pass(pcap_file):
@@ -90,8 +95,40 @@ def _pkinit_pass(pcap_file):
     return out
 
 
+def _dcom_pass(pcap_file):
+    out = []
+    rows = fields(
+        pcap_file,
+        "dcerpc.cn_bind_to_uuid",
+        ["ip.src", "ip.dst", "dcerpc.cn_bind_to_uuid", "dcerpc.opnum"],
+    )
+    for src, dst, uuid, opnum in rows:
+        interface = (uuid or "").strip().lower()
+        if interface not in WCCE_UUIDS:
+            continue
+        evidence = {
+            "interface": interface,
+            "name": WCCE_UUIDS[interface],
+            "opnum": opnum or "",
+        }
+        out.append(
+            (
+                "enrollment-dcom",
+                "high",
+                src or "",
+                dst or "",
+                "",
+                "",
+                "",
+                "",
+                json.dumps(evidence, sort_keys=True),
+            )
+        )
+    return out
+
+
 def process_adcs(pcap_file):
-    rows = _http_pass(pcap_file) + _pkinit_pass(pcap_file)
+    rows = _http_pass(pcap_file) + _pkinit_pass(pcap_file) + _dcom_pass(pcap_file)
     deduped = []
     seen = set()
     for row in rows:

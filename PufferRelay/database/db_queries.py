@@ -240,13 +240,32 @@ def insert_into_database(protocol, data, db_path=None):
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} IPv6/ADIDNS events")
         elif protocol == "dbcreds":
+            # Backward-compatible: older callers pass 8 fields without hashcat.
+            normalized = [
+                tuple(row) + ("",) * (9 - len(row)) if len(row) < 9 else tuple(row)[:9]
+                for row in data
+            ]
             cursor.executemany("""
                 INSERT OR IGNORE INTO database_creds
                     (protocol, src_ip, dst_ip, username, secret, kind,
-                     fingerprint, server)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, data)
+                     fingerprint, server, hashcat)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, normalized)
             logging.debug(f"Inserted {cursor.rowcount} database credentials")
+        elif protocol in ("rdp", "cloudapi"):
+            rows = [
+                (protocol,) + tuple(row) + ("",) * (7 - len(row))
+                if len(row) < 7
+                else (protocol,) + tuple(row)
+                for row in data
+            ]
+            cursor.executemany("""
+                INSERT OR IGNORE INTO service_events
+                    (protocol, kind, severity, src_ip, dst_ip, principal, detail,
+                     evidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, rows)
+            logging.debug(f"Inserted {cursor.rowcount} {protocol} service events")
         elif protocol == "smbobjects":
             # Same tuple shape as "files": (protocol, src, dst, filename,
             # content_type, size, sha256, data)
@@ -392,7 +411,13 @@ PROTOCOL_TABLES = {
              ["kind", "severity", "src_ip", "dst_ip", "detail"]),
     "dbcreds": ("database_creds",
                 ["protocol", "src_ip", "dst_ip", "username", "secret", "kind",
-                 "fingerprint", "server"]),
+                 "fingerprint", "server", "hashcat"]),
+    "rdp": ("service_events",
+            ["protocol", "kind", "severity", "src_ip", "dst_ip", "principal",
+             "detail"]),
+    "cloudapi": ("service_events",
+                 ["protocol", "kind", "severity", "src_ip", "dst_ip",
+                  "principal", "detail"]),
     "smbobjects": ("captured_files",
                    ["protocol", "src_ip", "dst_ip", "filename", "content_type",
                     "size", "sha256"]),

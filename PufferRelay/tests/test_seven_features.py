@@ -142,6 +142,8 @@ def test_adcs_http_and_pkinit(monkeypatch):
         if "certsrv" in display_filter:
             return [("10.0.0.5", "10.0.0.10", "ca.corp",
                      "/certsrv/certfnsh.asp", "NTLM TlRMTVNTUAAB", "")]
+        if "cn_bind_to_uuid" in display_filter:
+            return []
         return [("10.0.0.5", "10.0.0.10", "alice", "CORP", "16")]
 
     monkeypatch.setattr(adcs, "fields", fake_fields)
@@ -173,19 +175,19 @@ def test_ipv6_takeover_combination(monkeypatch):
 # --------------------------------------------------------------------------- #
 def test_database_auth_redis_mysql_postgres(monkeypatch):
     redis_payload = b"*2\r\n$4\r\nAUTH\r\n$8\r\ns3cret!!\r\n".hex()
-
-    def fake_fields(pcap, display_filter, names, **kwargs):
-        if "6379" in display_filter:
-            return [("10.0.0.5", "10.0.0.20", redis_payload)]
-        if "mysql" in display_filter:
-            return [("10.0.0.5", "10.0.0.21", "dbuser", "aabbccddeeff", "QUERY")]
-        return [
-            ("10.0.0.5", "10.0.0.22", "user", "alice", "", "", "", ""),
-            ("10.0.0.5", "10.0.0.22", "database", "app", "", "", "", ""),
-            ("10.0.0.5", "10.0.0.22", "", "", "pglit", "3", "", ""),
-        ]
-
-    monkeypatch.setattr(database_auth, "fields", fake_fields)
+    rows = [
+        ("10.0.0.5", "10.0.0.20", "6379", redis_payload, "", "", "", "", "", "",
+         "", "", ""),
+        ("10.0.0.5", "10.0.0.21", "3306", "", "dbuser", "aabbccddeeff", "",
+         "", "", "", "", "", ""),
+        ("10.0.0.5", "10.0.0.22", "5432", "", "", "", "", "user", "alice", "",
+         "", "", ""),
+        ("10.0.0.5", "10.0.0.22", "5432", "", "", "", "", "database", "app", "",
+         "", "", ""),
+        ("10.0.0.5", "10.0.0.22", "5432", "", "", "", "", "", "", "pglit", "3",
+         "", ""),
+    ]
+    monkeypatch.setattr(database_auth, "fields", lambda *a, **k: rows)
     result = database_auth.process_database_auth("x.pcap")
     protocols = {row[0] for row in result}
     assert protocols == {"redis", "mysql", "postgres"}

@@ -73,7 +73,8 @@ PufferRelay/
   proxy.py               #16 local TCP relay + JSONL recording (opt-in)
   commands.py            #13/#60 text-only command generators
   export.py              inventories + leads.json/leads.md/agent-prompt.md
-  report.py              Markdown engagement report (secrets; local only)
+  report.py              Markdown/HTML engagement report (secrets; local only)
+  diff.py                two-database delta (diff.md)
   triage.py              optional loopback-only Ollama lead ranking
   protocols/
     fields_handlers.py   field-based implementations of the protocol handlers
@@ -97,6 +98,9 @@ PufferRelay/
     kerberos_depth.py    S4U, delegation flags, UnPAC chains
     ldapdir.py           SPN -> account and objectSID from LDAP results
     voip.py              SIP and Skinny/SCCP call metadata
+    rdp.py               RDP negotiation and visible client identity
+    cloudapi.py          Docker/K8s/etcd/Consul/Vault/Veeam exposure
+  profile.py             --auto: handlers selected from observed services
     quick_wins.py        regex sweep over every packet for "quick win" flags
   database/
     db_models.py         CREATE TABLE IF NOT EXISTS + quick_wins seed
@@ -105,7 +109,7 @@ PufferRelay/
   utils/
     display.py           Rich tables/panels
     loading_animation.py spinner + READY banner
-  tests/                 pytest suite (124 tests: pure, DB, e2e pcap, CLI, relay)
+  tests/                 pytest suite (134 tests: pure, DB, e2e pcap, CLI, relay)
 ```
 
 Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->
@@ -167,22 +171,24 @@ Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->
 
 ## 8. Known gaps
 
-- A default full run starts 33 tshark passes for 31 handlers; the Kerberos
-  family is shared, and `--only`/`--credentials-only` remain the large-capture
-  lever. `scripts/benchmark.py` reports the pass count.
-- ADCS DCOM-only enrollment, SCCM provider DCOM and MySQL native/SCRAM hash
-  modes are not fully parsed; their catalog entries are `partial`. Encrypted
-  SMB3 objects cannot be carved.
+- A default full run starts 36 tshark passes for 34 handlers; `--auto` selects
+  from the observed services (10 handlers on the mixed benchmark),
+  `--only`/`--credentials-only` remain the manual levers.
+- ADCS template/CA names are not extracted from LDAP; SCCM SMS Provider DCOM
+  is not parsed. Their catalog entries stay `partial`. Encrypted SMB3 objects
+  cannot be carved.
 - LDAP attribute/value pairing is positional; objectSID and SPN mapping can be
   confused by commas or split searchResultEntry packets.
+- MySQL/PostgreSQL hash formats assume the salt and response are both visible;
+  SCRAM is reported as a mechanism only.
 - `--triage` requires a local Ollama model and is loopback-only by design;
-  `report.md` contains real secrets and is a confidential artifact.
-- Media is carved when it travels over HTTP/FTP/SMB; RTP/SRTP media is not
-  decoded. SIP/Skinny signalling is decoded, not the calls themselves.
-- CI runs on Linux with the distro tshark only; Windows/macOS tshark versions
-  are not in the matrix.
+  `report.md`/`report.html` and `diff.md` contain real secrets.
+- Media is carved when it travels over HTTP/FTP/SMB; RTP/SRTP is not decoded.
+  SIP/Skinny signalling is decoded, not the calls themselves.
+- CI matrix covers Linux (3.11/3.13), Windows and macOS with the OS tshark;
+  the wiki check runs on the Linux job.
 - GitBook is prepared (`.gitbook.yaml` + `wiki/SUMMARY.md`); publishing needs
-  the GitBook space credentials/decision.
+  the GitBook space credentials/decision (see `docs/GITBOOK.md`).
 - `--read` with no `-f` still creates the DB in cwd; document/guard.
 
 ## 8. Documentation surfaces

@@ -33,7 +33,7 @@ pufferrelay -r --has-creds --json                   # ask the database
 | NTLM authentication crosses SMB, LDAP or HTTP and the destination signing state is visible | `relays` | relay-targets.txt, relays.tsv; leads RELAY-* | the capture does not prove a relay was attempted or will succeed |
 | SMB tree connects, creates or reads are present | `smb` | smb-shares.txt, smb-files.txt; leads SMB-*, SMBFILE-* | file names come from CREATE/READ frames; content needs smbobjects |
 | HTTP responses or FTP-DATA carry file objects | `files` | files.tsv, files/; leads FILE-* | 1 MiB/object, 16 MiB/capture; TLS and segmented SMB are opaque |
-| EAPOL/EAP or RADIUS frames are present | `nac` | nac.txt; leads NAC-* | no keys; spoof proposals are Tier B and not generated here |
+| EAPOL/EAP or RADIUS frames are present | `nac` | nac.txt; leads NAC-*; --commands adds text-only 802.1X/MAB proposals | no keys; spoof proposals are text-only and appear in active-commands.md |
 | HTTP requests look like Windows Update/WSUS | `wsus` | wsus.txt; leads WSUS-* | approval state and package integrity are not visible |
 | TCP SYN/acknowledgement traffic is present | `services` | hosts.tsv, nmap-targets.txt | only observed ports; no banner or version unless another handler sees it |
 | IP traffic is present | `ips` | ips.txt, subnets.txt | a capture from a tap may include unrelated hosts |
@@ -42,14 +42,16 @@ pufferrelay -r --has-creds --json                   # ask the database
 | TGS-REQ/TGS-REP exchanges are present | `kerberoast` | kerberoast-hashes.txt; leads KERBEROAST-*, KERBEROASTCAND-* | fragmented/unreassembled DER yields a candidate without a hash; SPN-to-account resolution needs directory data |
 | HTTP requests/responses carry authentication headers, cookies or token-shaped strings | `httptokens` | tokens.tsv (fingerprints); leads TOKEN-* | TLS is opaque; headers split across TCP segments may be missed; JWT signature is not verified |
 | DCE/RPC binds/requests to EFSRPC, RPRN, DFSNM or FSRVP are present | `coercion` | coercions.tsv; leads COERCE-* | encrypted RPC is opaque; a bind or pipe without a UNC path is normal traffic and is ignored |
-| HTTP /certsrv enrollment or Kerberos PKINIT is present | `adcs` | adcs.tsv; leads ADCS-* | template attributes are usually not visible; DCOM-only enrollment is not fully parsed |
+| HTTP /certsrv enrollment, Kerberos PKINIT or MS-WCCE DCOM enrollment is present | `adcs` | adcs.tsv; leads ADCS-* | template attributes are usually not visible; enrollment success is not confirmed |
 | DHCPv6, ICMPv6 router advertisements or DNS UPDATE are present | `ipv6` | ipv6.tsv; leads IPV6-* | no baseline of the legitimate resolver; confirm before calling it rogue |
-| Redis, MySQL or PostgreSQL traffic is present | `dbcreds` | db-creds.tsv; leads DB-* | MSSQL stays with the NTLM handler; SCRAM/native responses need the matching hashcat mode |
+| Redis, MySQL or PostgreSQL traffic is present | `dbcreds` | db-creds.tsv; leads DB-* | MSSQL stays with the NTLM handler; SCRAM exchanges expose only the mechanism |
 | SMB traffic carries file objects that tshark can reassemble | `smbobjects` | files.tsv, files/ | 8 MiB/object, 16 MiB/capture; SMB3 encryption and missing reassembly yield nothing |
-| SCCM management/distribution HTTP or SMS shares are present | `sccm` | sccm.tsv; leads SCCM-* | SMS Provider DCOM and policy objects are not parsed; package delivery alone is inventory |
+| SCCM management/distribution HTTP, SMS shares or site-server admin-share traffic is present | `sccm` | sccm.tsv; leads SCCM-* | SMS Provider DCOM and policy objects are not parsed |
 | HTTP traffic targets an LLM service, MCP endpoint or vector database | `llm` | llm.tsv; leads LLM-* | TLS is opaque; ambiguous ports are recognised only by path markers; prompts are not exported |
 | Kerberos AS/TGS exchanges carry delegation or PKINIT padata | `kerberosdepth` | kerberos-signals.tsv; leads KERB-* | heuristic from flags/padata; it does not prove the delegation succeeds; hashes are not extracted |
 | LDAP search results contain sAMAccountName, objectSID or servicePrincipalName | `ldapdir` | ldap-spns.tsv; leads SPN-*; objectSID upgrades BloodHound identifiers | attribute/value pairing is positional and can be confused by commas or split entries |
+| RDP negotiation or client data is present | `rdp` | rdp.tsv; leads RDP-* | CredSSP passwords are encrypted; identity extraction depends on client data being visible |
+| Docker, Kubernetes, kubelet, etcd, Consul, Vault or Veeam ports carry HTTP | `cloudapi` | cloud-apis.tsv; leads CLOUD-* | TLS is opaque; only the request side is seen, and a 401 response cannot be distinguished from success |
 | SIP or Cisco Skinny/SCCP signalling is present | `voip` | voip.tsv; leads VOIP-* | media (RTP) is not decoded; TLS/SIPS is opaque; digest challenges are not cracked |
 | -q is used, or -f is combined with -q | `quickwins` | quick_wins table; leads QW-* | presence is not exploitability; signing may be enforced elsewhere |
 

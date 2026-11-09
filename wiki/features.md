@@ -18,7 +18,10 @@ misses, output, next step) is **[DETECTIONS.md](DETECTIONS.md)**, generated from
 | AD directory | SPN→account mapping and objectSID from LDAP results; LDAP signing inference |
 | Attack chains | coercion + credential/hash + relay target, and credential + relay target correlations |
 | VoIP | SIP registrations/calls (digest presence), Skinny/SCCP call metadata |
-| Reporting | `report.md` engagement report, optional loopback-Ollama triage (`triage.md`) |
+| Remote access | RDP negotiation/protocols and client identity when visible |
+| Infrastructure APIs | Docker/Kubernetes/kubelet/etcd/Consul/Vault/Veeam exposure and missing auth |
+| Reporting | `report.md`/`report.html`, two-capture `diff.md`, optional loopback-Ollama triage |
+| Profiling | `--auto` selects handlers from the observed services |
 | Secrets | HTTP bearer/JWT/Vault/GitLab/GitHub/AWS tokens (fingerprinted in exports), database auth material |
 | AD exposure | RPC coercion attempts, ADCS enrollment/PKINIT, SCCM management traffic, relay candidates |
 | AI infrastructure | LLM endpoints/API usage, unauthenticated inference, MCP tool calls, vector DBs |

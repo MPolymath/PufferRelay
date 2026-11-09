@@ -171,11 +171,16 @@ def main():
         help="PCAP file to analyze for quick wins (optional with -r or -f)",
     )
     parser.add_argument(
+        "--auto",
+        action="store_true",
+        help="Profile the capture's services and run only the relevant handlers",
+    )
+    parser.add_argument(
         "--only",
         help="Run only these handlers, comma separated "
         "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,kerberos,"
         "kerberosdepth,kerberoast,ldapdir,httptokens,coercion,adcs,ipv6,dbcreds,"
-        "smbobjects,sccm,llm,voip,services,dns,asrepcatcher,ips)",
+        "smbobjects,sccm,llm,voip,rdp,cloudapi,services,dns,asrepcatcher,ips)",
     )
     parser.add_argument(
         "--credentials-only",
@@ -217,7 +222,7 @@ def main():
         help="With -r: show the raw rows of these protocols "
         "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,kerberos,"
         "kerberosdepth,kerberoast,ldapdir,httptokens,coercion,adcs,ipv6,dbcreds,"
-        "sccm,llm,voip,services,dns,asrepcatcher,ips)",
+        "sccm,llm,voip,rdp,cloudapi,services,dns,asrepcatcher,ips)",
     )
     parser.add_argument(
         "--ip",
@@ -272,6 +277,16 @@ def main():
         "--triage-out",
         metavar="FILE",
         help="Triage output path (default: output_dir/triage.md)",
+    )
+    parser.add_argument(
+        "--diff",
+        metavar="DB",
+        help="Compare the current database with another database and write diff.md",
+    )
+    parser.add_argument(
+        "--diff-out",
+        metavar="FILE",
+        help="Diff output path (default: output_dir/diff.md)",
     )
     parser.add_argument(
         "--log-level",
@@ -375,6 +390,8 @@ def main():
         args.read = True
     if args.triage and not (args.file or args.quick_wins or args.read):
         args.read = True
+    if args.diff and not (args.file or args.quick_wins or args.read):
+        args.read = True
 
     # ---- active modes: explicit, warned, confirmed, never default -----
     if args.proxy is not None:
@@ -461,6 +478,22 @@ def main():
     else:
         update_animation, show_ready = show_loading_animation()
     only = args.only.split(",") if args.only else None
+    if args.auto:
+        if args.only:
+            print("error: use --auto or --only, not both", file=sys.stderr)
+            sys.exit(2)
+        if not args.file:
+            print("error: --auto requires a capture (-f/--live)", file=sys.stderr)
+            sys.exit(2)
+        from PufferRelay.profile import select_profile
+        from PufferRelay.protocols.services_handler import process_services
+
+        observed = process_services(args.file)
+        only = select_profile(observed)
+        if only:
+            logging.info("auto profile: %s", ",".join(only))
+        else:
+            logging.info("auto profile: capture too generic, running all handlers")
 
     conn = None
     try:
@@ -682,6 +715,43 @@ def main():
                             "Loopback model only; lead metadata was sent, never "
                             "credentials or packet data.",
                             title="Local LLM triage",
+                            border_style="green",
+                        )
+                    )
+
+            if args.diff:
+                import sqlite3 as sqlite_module
+
+                from PufferRelay import diff as diff_module
+
+                if not os.path.exists(args.diff):
+                    print(f"diff error: database not found: {args.diff}", file=sys.stderr)
+                    sys.exit(2)
+                old = sqlite_module.connect(f"file:{args.diff}?mode=ro", uri=True)
+                try:
+                    old_inventory = export.collect_inventory(old)
+                finally:
+                    old.close()
+                new_inventory = export.collect_inventory(conn)
+                old_inventory["leads"] = export.build_leads(old_inventory)
+                new_inventory["leads"] = export.build_leads(new_inventory)
+                delta = diff_module.diff_inventories(old_inventory, new_inventory)
+                diff_path = args.diff_out or os.path.join(
+                    get_output_dir() or "out", "diff.md"
+                )
+                diff_module.write_diff(diff_path, delta, args.diff, "current database")
+                if machine:
+                    print(diff_path, file=sys.stderr)
+                else:
+                    rprint(
+                        Panel(
+                            "[green]Capture diff written:[/green]\n"
+                            f"  {diff_path}\n\n"
+                            f"New hosts: {len(delta['new_hosts'])} · "
+                            f"users: {len(delta['new_users'])} · "
+                            f"credentials: {len(delta['new_credentials'])} · "
+                            f"leads: {len(delta['new_leads'])}",
+                            title="Diff",
                             border_style="green",
                         )
                     )

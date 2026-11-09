@@ -25,7 +25,7 @@ REQUIRED = [
 ]
 CLASSES = [
     "inventory", "credentials", "hashes", "kerberos", "ad", "network", "web",
-    "files", "weakness", "ai", "active",
+    "files", "weakness", "cloud", "ai", "active",
 ]
 MODES = {"passive", "active"}
 SEVERITIES = {"critical", "high", "medium", "low", "varies"}

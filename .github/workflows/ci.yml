@@ -6,20 +6,50 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.11"
+            wiki: true
+          - os: ubuntu-latest
+            python: "3.13"
+            wiki: false
+          - os: windows-latest
+            python: "3.13"
+            wiki: false
+          - os: macos-latest
+            python: "3.13"
+            wiki: false
+    runs-on: ${{ matrix.os }}
     env:
       DEBIAN_FRONTEND: noninteractive
+      PYTHONIOENCODING: utf-8
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python }}
 
-      - name: install tshark
+      - name: install tshark (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y tshark
+
+      - name: install tshark (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install wireshark -y --no-progress
+          "C:\Program Files\Wireshark" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: install tshark (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install --cask wireshark
+          echo "/Applications/Wireshark.app/Contents/MacOS" >> "$GITHUB_PATH"
 
       - name: install python dependencies
         run: |
@@ -33,4 +63,5 @@ jobs:
         run: python -m pytest PufferRelay/tests -q
 
       - name: wiki catalog is current
+        if: matrix.wiki
         run: python scripts/build_wiki.py --check

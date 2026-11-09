@@ -762,10 +762,10 @@ def collect_database_creds(conn: sqlite3.Connection) -> List[Dict]:
     out = []
     if not _has_table(conn, "database_creds"):
         return out
-    for protocol, src, dst, user, secret, kind, mark, server in _rows(
+    for protocol, src, dst, user, secret, kind, mark, server, hashcat in _rows(
         conn,
         "SELECT protocol, src_ip, dst_ip, username, secret, kind, fingerprint, "
-        "server FROM database_creds",
+        "server, hashcat FROM database_creds",
     ):
         out.append(
             {
@@ -777,6 +777,35 @@ def collect_database_creds(conn: sqlite3.Connection) -> List[Dict]:
                 "kind": kind or "",
                 "fingerprint": mark or "",
                 "server": server or "",
+                "hashcat": hashcat or "",
+            }
+        )
+    return out
+
+
+def collect_service_events(conn: sqlite3.Connection, protocol: str) -> List[Dict]:
+    out = []
+    if not _has_table(conn, "service_events"):
+        return out
+    for kind, severity, src, dst, principal, detail, evidence in _rows(
+        conn,
+        "SELECT kind, severity, src_ip, dst_ip, principal, detail, evidence "
+        "FROM service_events WHERE protocol = ?",
+        (protocol,),
+    ):
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "medium",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "principal": principal or "",
+                "detail": detail or "",
+                "evidence": parsed,
             }
         )
     return out
@@ -926,7 +955,7 @@ def _unc_host(unc: str) -> str:
 
 
 def build_chains(inventory: Dict) -> List[Dict]:
-    """Correlate coercion, credentials/hashes and relay targets into chains."""
+    """Correlate coercion, credentials/hashes, LDAP signing and relay targets."""
     hosts = inventory.get("hosts", [])
     by_name = {}
     for host in hosts:
@@ -939,6 +968,16 @@ def build_chains(inventory: Dict) -> List[Dict]:
         for relay in inventory.get("relays", [])
         if relay.get("candidate") and relay.get("signing_required") is False
     ]
+    signing = {
+        row["destination_ip"]: row
+        for row in inventory.get("ldap_signing", [])
+        if row.get("destination_ip")
+    }
+    enrollments = {
+        row["destination_ip"]
+        for row in inventory.get("adcs", [])
+        if row.get("kind") == "enrollment" and row.get("severity") == "high"
+    }
 
     def users_at(target):
         users = {row["username"] for row in credentials if row["destination_ip"] == target}
@@ -948,7 +987,7 @@ def build_chains(inventory: Dict) -> List[Dict]:
     chains = []
     seen = set()
 
-    def add(kind, severity, target, users, source, evidence):
+    def add(kind, severity, target, users, source, evidence, missing, confidence):
         key = (kind, target, ",".join(sorted(users)))
         if key in seen or not target:
             return
@@ -957,10 +996,12 @@ def build_chains(inventory: Dict) -> List[Dict]:
             {
                 "kind": kind,
                 "severity": severity,
+                "confidence": confidence,
                 "target": target,
                 "users": sorted(users),
                 "source": source,
                 "evidence": evidence,
+                "missing": missing,
             }
         )
 
@@ -971,20 +1012,33 @@ def build_chains(inventory: Dict) -> List[Dict]:
         target = by_name.get(host.lower(), host)
         users = users_at(target)
         relay = any(item["destination_ip"] == target for item in relays)
-        if users or relay:
-            add(
-                "coercion-relay-chain",
-                "critical" if users else "high",
-                target,
-                users,
-                row.get("kind", ""),
-                {
-                    "coercion": row.get("kind", ""),
-                    "unc": row.get("unc", ""),
-                    "relay_target": relay,
-                    "users": sorted(users),
-                },
-            )
+        ldap_sign = bool(signing.get(target, {}).get("simple_binds"))
+        adcs = target in enrollments
+        if not (users or relay or ldap_sign or adcs):
+            continue
+        missing = []
+        if not users:
+            missing.append("no credential or hash for the target")
+        if not relay:
+            missing.append("no relay candidate with signing disabled")
+        if not ldap_sign and not adcs:
+            missing.append("no LDAP-signing or ADCS evidence for the target")
+        add(
+            "coercion-relay-chain",
+            "critical" if users and relay else "high",
+            target,
+            users,
+            row.get("kind", ""),
+            {
+                "coercion": row.get("kind", ""),
+                "unc": row.get("unc", ""),
+                "relay_target": relay,
+                "ldap_simple_binds": ldap_sign,
+                "adcs_enrollment": adcs,
+            },
+            missing,
+            "high" if users and relay else "medium",
+        )
 
     for relay in relays:
         target = relay["destination_ip"]
@@ -999,8 +1053,35 @@ def build_chains(inventory: Dict) -> List[Dict]:
                 {
                     "protocol": relay.get("protocol", ""),
                     "signing_required": relay.get("signing_required"),
-                    "users": sorted(users),
                 },
+                [],
+                "high",
+            )
+        ldap_sign = bool(signing.get(target, {}).get("simple_binds"))
+        if ldap_sign:
+            add(
+                "ldap-relay-chain",
+                "high",
+                target,
+                users,
+                "LDAP",
+                {
+                    "simple_binds": signing[target].get("simple_binds"),
+                    "binds": signing[target].get("binds"),
+                },
+                [] if users else ["no credential or hash for the LDAP target"],
+                "high" if users else "medium",
+            )
+        if target in enrollments:
+            add(
+                "adcs-relay-chain",
+                "critical",
+                target,
+                users,
+                "ADCS",
+                {"enrollment": "NTLM enrollment observed", "relay_target": True},
+                [] if users else ["no credential or hash for the CA"],
+                "high" if users else "medium",
             )
     return chains
 
@@ -1060,6 +1141,8 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "ldap_spns": collect_ldap_spns(conn),
         "ldap_signing": collect_ldap_signing(conn),
         "voip": collect_voip(conn),
+        "rdp": collect_service_events(conn, "rdp"),
+        "cloudapi": collect_service_events(conn, "cloudapi"),
     }
     inventory["chains"] = build_chains(inventory)
     return inventory
@@ -1489,6 +1572,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
                     "source_ip": row["source_ip"],
                     "destination_ip": row["destination_ip"],
                     "server": row["server"],
+                    "hashcat": row.get("hashcat", ""),
                 },
                 "suggested_actions": [
                     {
@@ -1503,7 +1587,11 @@ def build_leads(inventory: Dict) -> List[Dict]:
                 else [
                     {
                         "intent": "Crack the response offline",
-                        "command": "hashcat with the matching database mode",
+                        "command": (
+                            f"hashcat -m {row['hashcat']} db-creds.tsv <wordlist>"
+                            if row.get("hashcat")
+                            else "hashcat with the matching database mode"
+                        ),
                         "active": False,
                     }
                 ],
@@ -1669,6 +1757,79 @@ def build_leads(inventory: Dict) -> List[Dict]:
                     {
                         "intent": "Review the SIP/Skinny endpoint and its exposure",
                         "command": "inspect voip.tsv and the matching signalling flow",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3p. RDP identity and negotiation.
+    for i, row in enumerate(inventory.get("rdp", []), start=1):
+        add(
+            {
+                "id": f"RDP-{i:03d}",
+                "severity": row["severity"],
+                "title": f"RDP {row['kind']}"
+                + (f": {row['principal']}" if row["principal"] else ""),
+                "why": row["detail"]
+                + " RDP exposure and identities help target interactive access; "
+                "CredSSP passwords are not visible.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Review the RDP exposure and account",
+                        "command": "inspect rdp.tsv and the host's service list",
+                        "active": False,
+                    }
+                ],
+            }
+        )
+
+    # 3q. Exposed infrastructure APIs.
+    for i, row in enumerate(inventory.get("cloudapi", []), start=1):
+        add(
+            {
+                "id": f"CLOUD-{i:03d}",
+                "severity": row["severity"],
+                "title": f"{row['kind']}: {row['detail']}",
+                "why": "An infrastructure API was reachable on the wire. An "
+                "unauthenticated control plane is a direct compromise path.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Verify the endpoint from the operator host",
+                        "command": "curl the documented base path (ACTIVE; scope)",
+                        "active": True,
+                        "warning": "Active: talks to the API. Confirm scope first.",
+                    }
+                ],
+            }
+        )
+
+    # 3r. WPAD lookups (proxy auto-config abuse).
+    wpad_seen = set()
+    for row in inventory.get("dns", []):
+        query = (row.get("query") or "").lower()
+        if not query.startswith("wpad"):
+            continue
+        key = (row.get("source_ip"), row.get("destination_ip"), query)
+        if key in wpad_seen:
+            continue
+        wpad_seen.add(key)
+        add(
+            {
+                "id": f"WPAD-{len(wpad_seen):03d}",
+                "severity": "medium",
+                "confidence": "medium",
+                "title": f"WPAD lookup from {row.get('source_ip') or 'a host'}",
+                "why": "WPAD name resolution can be abused to serve a malicious "
+                "proxy auto-config and harvest NTLM authentication.",
+                "evidence": row,
+                "suggested_actions": [
+                    {
+                        "intent": "Check whether the WPAD answer came from a "
+                        "legitimate proxy",
+                        "command": "inspect dns.txt and the proxy configuration",
                         "active": False,
                     }
                 ],
@@ -2321,11 +2482,12 @@ def write_exports(
     )
     _write_text(
         path("db-creds.tsv"),
-        ["protocol	src	dst	username	secret	kind	server"]
+        ["protocol	src	dst	username	secret	kind	server	hashcat"]
         + [
             f"{row['protocol']}	{row['source_ip'] or '-'}	"
             f"{row['destination_ip'] or '-'}	{row['username'] or '-'}	"
-            f"{row['secret'] or '-'}	{row['kind']}	{row['server'] or '-'}"
+            f"{row['secret'] or '-'}	{row['kind']}	{row['server'] or '-'}	"
+            f"{row['hashcat'] or '-'}"
             for row in inventory.get("database_credentials", [])
         ],
     )
@@ -2386,6 +2548,26 @@ def write_exports(
             f"{row['destination_ip'] or '-'}	{row['caller'] or '-'}	"
             f"{row['callee'] or '-'}	{row['call_id'] or '-'}	{row['detail']}"
             for row in inventory.get("voip", [])
+        ],
+    )
+    _write_text(
+        path("rdp.tsv"),
+        ["kind	severity	src	dst	principal	detail"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['principal'] or '-'}	"
+            f"{row['detail']}"
+            for row in inventory.get("rdp", [])
+        ],
+    )
+    _write_text(
+        path("cloud-apis.tsv"),
+        ["kind	severity	src	dst	principal	detail"]
+        + [
+            f"{row['kind']}	{row['severity']}	{row['source_ip'] or '-'}	"
+            f"{row['destination_ip'] or '-'}	{row['principal'] or '-'}	"
+            f"{row['detail']}"
+            for row in inventory.get("cloudapi", [])
         ],
     )
     media = [

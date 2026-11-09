@@ -68,6 +68,18 @@ Issue bodies: `../attack-library/pufferrelay-issues/` (filed as #64-#71).
       (Ollama, off by default).
 - [x] VoIP (#17: SIP/Skinny) and media inventory (`media.tsv`); GitBook config
       (`.gitbook.yaml`, `SUMMARY.md`) prepared.
+- [x] ADCS DCOM enrollment (ICertRequestD/D2, ICertAdminD2) and SCCM
+      client-push detection; catalog entries updated.
+- [x] Database hash formats: MySQL `$mysqlna$` (11200), PostgreSQL MD5
+      `$postgres$` (12), `hashcat` column in `db-creds.tsv`.
+- [x] Hardened chains: LDAP-signing and ADCS relay chains, missing-evidence
+      lists and confidence on every chain.
+- [x] CI matrix: Linux 3.11/3.13, Windows and macOS with their tshark.
+- [x] `--auto` profile: handlers selected from observed services (10 handlers /
+      14 passes / 6.7 s vs 34 / 36 / 18 s on the 20k benchmark).
+- [x] Report HTML, `--diff` two-database delta, cleanup checklist.
+- [x] RDP identity/negotiation, Docker/K8s/etcd/Consul/Vault/Veeam exposure,
+      WPAD lookups, and the NAC spoof proposals (#30) in `active-commands.md`.
 - [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM

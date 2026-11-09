@@ -85,6 +85,32 @@ Each handler is one pass; a few need two. The shared Kerberos pass serves
 Use `--only` or `--credentials-only` on large captures; `scripts/benchmark.py`
 prints the pass count on synthetic data.
 
+**What does `--auto` do?**
+It runs the cheap services pass, then only the handlers whose protocol family
+is present. On the 20k synthetic benchmark that is 10 handlers / 14 passes /
+6.7 s instead of 34 handlers / 36 passes / 18 s. If fewer than two known ports
+are found it falls back to the full set.
+
+**How do I compare two captures?**
+`pufferrelay -r --diff old.db` compares the current database with `old.db` and
+writes `diff.md` (new hosts/users/credentials/hashes/leads). Both databases
+are local; the diff is confidential.
+
+**Can the report be a PDF?**
+`--report out/report.html` writes a standalone HTML page (escaped, printable);
+use the browser's Print → Save as PDF. PDF generation is intentionally not a
+dependency.
+
+**What hash formats do database credentials use?**
+MySQL salt+response becomes a `$mysqlna$…` line (hashcat 11200); PostgreSQL
+MD5 becomes `$postgres$*user*salt*hash` (hashcat 12). `db-creds.tsv` has a
+`hashcat` column. Clear-text Redis/PostgreSQL rows have no mode.
+
+**Where are the NAC spoof proposals (#30)?**
+In `active-commands.md` (written by `--commands`) when the capture contains
+EAP/RADIUS/MAB observations; they are text only, with cleanup, and the section
+is omitted when there is no NAC data.
+
 **Where is the database?**
 By default `extracted_data.db` in the working directory. Use `--db PATH` or
 `db_path` in the config file to keep it with the engagement; delete it with the

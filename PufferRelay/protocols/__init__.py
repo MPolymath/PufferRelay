@@ -52,6 +52,8 @@ from .llm_traffic import process_llm_traffic
 from .kerberos_depth import process_kerberos_depth
 from .ldapdir import process_ldap_directory
 from .voip import process_voip
+from .rdp import process_rdp
+from .cloudapi import process_cloudapi
 
 __all__ = [
     'process_ldap',
@@ -85,5 +87,7 @@ __all__ = [
     'process_llm_traffic',
     'process_kerberos_depth',
     'process_ldap_directory',
-    'process_voip'
+    'process_voip',
+    'process_rdp',
+    'process_cloudapi'
 ]

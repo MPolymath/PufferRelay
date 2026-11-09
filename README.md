@@ -71,8 +71,11 @@ pufferrelay --config config.json -f {filename} <br>
 # `--dump` without a directory uses output_dir; default_pcap is used when
 # -f/-q is omitted.
 
-#### Report and optional local triage
+#### Auto profile, report and diff
 ```bash
+pufferrelay -f capture.pcapng --auto --dump out       # only relevant handlers
+pufferrelay -f capture.pcapng --report out/report.html # Markdown or HTML
+pufferrelay -r --diff old.db                          # new hosts/users/leads
 pufferrelay -f capture.pcapng --report out/report.md   # confidential deliverable
 pufferrelay -r --triage --triage-model llama3          # loopback Ollama only
 ```

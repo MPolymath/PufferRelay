@@ -1,8 +1,9 @@
-"""Database authentication material (issue #69) — passive.
+"""Database authentication material (issue #69, step 3) — one pass, hash formats.
 
-Redis AUTH is cleartext RESP; MySQL exposes the login username and response
-scramble; PostgreSQL exposes startup parameters, cleartext password auth and
-MD5/SASL material. MSSQL is already covered by the NTLM handler.
+Redis AUTH is cleartext RESP. MySQL exposes the greeting salt and the login
+response, which form a MySQL CRAM (hashcat 11200) line. PostgreSQL exposes
+startup parameters plus clear-text, MD5 challenge-response (hashcat 12) or
+SCRAM mechanism. One tshark pass covers all three protocols.
 """
 
 from __future__ import annotations
@@ -12,6 +13,22 @@ import re
 
 from PufferRelay.tshark_fields import fields
 
+FILTER = "tcp.port == 6379 || mysql || pgsql"
+FIELDS = [
+    "ip.src",
+    "ip.dst",
+    "tcp.port",
+    "tcp.payload",
+    "mysql.user",
+    "mysql.passwd",
+    "mysql.salt",
+    "pgsql.parameter_name",
+    "pgsql.parameter_value",
+    "pgsql.password",
+    "pgsql.authtype",
+    "pgsql.salt",
+    "pgsql.auth.sasl.mech",
+]
 REDIS_AUTH = re.compile(r"(?i)\bAUTH\r?\n?\$\d+\r?\n([^\r\n]+)")
 REDIS_INLINE = re.compile(r"(?i)^\s*AUTH\s+(\S+)\s*$", re.M)
 
@@ -32,134 +49,102 @@ def _decode(hex_payload):
         return ""
 
 
-def _redis_pass(pcap_file):
-    out = []
-    rows = fields(
-        pcap_file,
-        "tcp.port == 6379",
-        ["ip.src", "ip.dst", "tcp.payload"],
-    )
-    for src, dst, payload in rows:
-        text = _decode(payload)
-        if not text:
-            continue
-        match = REDIS_AUTH.search(text) or REDIS_INLINE.search(text.replace("\r", ""))
-        if not match:
-            continue
-        password = match.group(1).strip()
-        if not password:
-            continue
-        out.append(
-            (
-                "redis",
-                src or "",
-                dst or "",
-                "",
-                password,
-                "redis-cleartext",
-                fingerprint(password),
-                "",
-            )
-        )
-    return out
-
-
-def _mysql_pass(pcap_file):
-    out = []
-    rows = fields(
-        pcap_file,
-        "mysql",
-        ["ip.src", "ip.dst", "mysql.user", "mysql.passwd", "mysql.command"],
-    )
-    for src, dst, user, passwd, command in rows:
-        user = (user or "").strip()
-        secret = (passwd or "").strip()
-        if not user or not secret:
-            continue
-        out.append(
-            (
-                "mysql",
-                src or "",
-                dst or "",
-                user,
-                secret,
-                "mysql-native-response",
-                fingerprint(secret),
-                "",
-            )
-        )
-    return out
-
-
-def _postgres_pass(pcap_file):
-    out = []
-    rows = fields(
-        pcap_file,
-        "pgsql",
-        [
-            "ip.src",
-            "ip.dst",
-            "pgsql.parameter_name",
-            "pgsql.parameter_value",
-            "pgsql.password",
-            "pgsql.authtype",
-            "pgsql.salt",
-            "pgsql.auth.sasl.mech",
-        ],
-    )
-    pending = {}
-    for src, dst, name, value, password, authtype, salt, mech in rows:
-        key = (src, dst)
-        params = pending.setdefault(key, {})
-        if name and value:
-            params[(name or "").strip().lower()] = (value or "").strip()
-        user = params.get("user", "")
-        database = params.get("database", "")
-        secret = (password or "").strip()
-        auth = str(authtype or "").strip()
-        if secret:
-            kind = "pg-cleartext" if auth == "3" else "pg-password"
-            out.append(
-                (
-                    "postgres",
-                    src or "",
-                    dst or "",
-                    user,
-                    secret,
-                    kind,
-                    fingerprint(secret),
-                    database,
-                )
-            )
-            continue
-        if auth == "5" and salt:
-            # md5 response is the `pgsql.password` field in older captures;
-            # keep the salt as evidence even without a response.
-            pass
-        if mech and mech.upper().startswith("SCRAM"):
-            out.append(
-                (
-                    "postgres",
-                    src or "",
-                    dst or "",
-                    user,
-                    "",
-                    "pg-scram-mech",
-                    "",
-                    database,
-                )
-            )
-    return out
+def _port(value):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return 0
 
 
 def process_database_auth(pcap_file):
-    rows = _redis_pass(pcap_file) + _mysql_pass(pcap_file) + _postgres_pass(pcap_file)
-    deduped = []
+    rows = fields(pcap_file, FILTER, FIELDS)
+    out = []
     seen = set()
-    for row in rows:
-        key = (row[0], row[1], row[2], row[3], row[6])
+    mysql_salts = {}
+    pg_salts = {}
+    pg_params = {}
+
+    def add(protocol, src, dst, user, secret, kind, hashcat, server):
+        mark = fingerprint(secret)
+        key = (protocol, src, dst, user, mark)
         if key in seen:
-            continue
+            return
         seen.add(key)
-        deduped.append(row)
-    return deduped
+        out.append(
+            (protocol, src or "", dst or "", user or "", secret or "", kind,
+             mark, server or "", hashcat)
+        )
+
+    for row in rows:
+        padded = tuple(row) + ("",) * (13 - len(row))
+        (
+            src,
+            dst,
+            port_text,
+            payload,
+            mysql_user,
+            mysql_pass,
+            mysql_salt,
+            pg_name,
+            pg_value,
+            pg_password,
+            pg_auth,
+            pg_salt,
+            pg_mech,
+        ) = padded[:13]
+        port = _port(port_text)
+
+        if port == 6379:
+            text = _decode(payload)
+            if text:
+                match = REDIS_AUTH.search(text) or REDIS_INLINE.search(
+                    text.replace("\r", "")
+                )
+                if match and match.group(1).strip():
+                    add("redis", src, dst, "", match.group(1).strip(),
+                        "redis-cleartext", "", "")
+
+        if (mysql_salt or "").strip() and not (mysql_user or "").strip():
+            mysql_salts[(src, dst)] = mysql_salt.strip()
+        if (mysql_user or "").strip() and (mysql_pass or "").strip():
+            salt = (mysql_salt or "").strip() or mysql_salts.get((dst, src), "")
+            if salt:
+                secret = f"$mysqlna${salt}${mysql_pass.strip()}"
+                add("mysql", src, dst, mysql_user.strip(), secret,
+                    "mysql-cram", "11200", "")
+            else:
+                add("mysql", src, dst, mysql_user.strip(), mysql_pass.strip(),
+                    "mysql-response", "", "")
+
+        if (pg_name or "").strip():
+            params = pg_params.setdefault((src, dst), {})
+            params[(pg_name or "").strip().lower()] = (pg_value or "").strip()
+        user = pg_params.get((src, dst), {}).get("user", "")
+        database = pg_params.get((src, dst), {}).get("database", "")
+        auth = str(pg_auth or "").strip()
+        salt = (pg_salt or "").strip()
+        if salt and auth == "5":
+            pg_salts[(src, dst)] = salt
+        if (pg_password or "").strip():
+            if auth == "5":
+                salt = salt or pg_salts.get((dst, src), "")
+                response = pg_password.strip()
+                if response.lower().startswith("md5"):
+                    response = response[3:]
+                if salt:
+                    secret = f"$postgres$*{user}*{salt}*{response}"
+                    add("postgres", src, dst, user, secret, "pg-md5", "12",
+                        database)
+                else:
+                    add("postgres", src, dst, user, pg_password.strip(),
+                        "pg-md5-response", "12", database)
+            elif auth == "3":
+                add("postgres", src, dst, user, pg_password.strip(),
+                    "pg-cleartext", "", database)
+            else:
+                add("postgres", src, dst, user, pg_password.strip(),
+                    "pg-password", "", database)
+        elif (pg_mech or "").upper().startswith("SCRAM"):
+            add("postgres", src, dst, user, "", "pg-scram-mech", "", database)
+
+    return out

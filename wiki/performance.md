@@ -15,14 +15,18 @@ registry):
 | Quick-win scan | 95.4 s | 0.6 s | 159x |
 
 Small provided captures: 4.1–5.1 s with the 14-handler registry; most of that
-is tshark startup per handler. The current registry has **31 handlers**, and a
+is tshark startup per handler. The current registry has **34 handlers**, and a
 2026-11-09 benchmark on a synthetic 20,000-packet mixed DNS/HTTP capture
-(`python scripts/benchmark.py --packets 20000`) measured **16.5 s for 33 tshark
-passes** (some detectors need two passes; the shared Kerberos pass serves
-`kerberos`, `kerberoast`, `asrepcatcher` and `kerberosdepth` in one). Use
-`--only` when you do not need everything.
+(`python scripts/benchmark.py --packets 20000`) measured **17.95 s for 36 tshark
+passes** (some detectors need more than one pass; the shared Kerberos pass
+serves `kerberos`, `kerberoast`, `asrepcatcher` and `kerberosdepth` in one).
 
-The loading screen shows `handler 3/31 ftp | elapsed 00:12 | ETA 00:41`; the
+**Auto profile (`--auto`) is the big lever**: the same capture selected 10
+handlers / 14 passes and parsed in **6.7 s** — the services pass picks the
+protocol families, and everything else is skipped. Use `--auto` on an unknown
+capture; use `--only` when you already know what you need.
+
+The loading screen shows `handler 3/34 ftp | elapsed 00:12 | ETA 00:41`; the
 same line is logged at INFO so long runs are predictable.
 
 ## Big captures
