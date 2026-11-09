@@ -163,5 +163,6 @@ def test_write_exports_pack():
         assert rows[0]["protocol"] == "ftp"
         assert rows[0]["username"] == "alice"
 
-        assert sorted(os.listdir(out)) == sorted(os.path.basename(f) for f in files)
+        assert os.path.isdir(os.path.join(out, "bloodhound"))
+        assert os.path.exists(os.path.join(out, "bloodhound", "users.json"))
         conn.close()

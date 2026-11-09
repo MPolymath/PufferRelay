@@ -74,6 +74,8 @@ Rules an agent must follow when consuming it:
 | `smb-files.txt` | host, share, file name, operation | data accessed over SMB |
 | `files.tsv` | sha256, size, type, protocol, src, dst, name, path | index of carved objects |
 | `files/` | the carved objects themselves | **client data**, local only |
+| `bloodhound/users.json`, `computers.json` | SharpHound Legacy JSON built from observed users/hosts/sessions | import as leads (no SIDs/ACLs) |
+| `bloodhound/README.txt` | what the graph does and does not prove | read before importing |
 | `summary.json` | inventory + leads | dashboards, diffing runs |
 
 ## CLI filters (issue #48)

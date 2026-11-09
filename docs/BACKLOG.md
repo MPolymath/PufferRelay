@@ -30,7 +30,9 @@ status board.
 - [x] #44 SMB extraction (shares, file names, printer shares; schema v6).
 - [x] #57 file carving from HTTP responses and FTP-DATA (schema v7,
       `files/` + `files.tsv`); SMB content carving is future work.
-- [ ] #15 BloodHound JSON export from captured identities/sessions.
+- [x] #15 BloodHound Legacy JSON export (users/computers/sessions observed;
+      deterministic UUID identifiers; no SIDs/ACLs — documented in
+      `bloodhound/README.txt`).
 - [ ] #39 quick-win severity + evidence upgrade.
 - [ ] Tier B (network actions) with warnings: #27, #16, #13, #60.
 

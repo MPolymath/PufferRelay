@@ -1208,6 +1208,15 @@ def write_exports(
             )
     _write_text(path("files.tsv"), file_entries)
 
+    # BloodHound Legacy JSON (issue #15): users/computers/sessions observed.
+    try:
+        from PufferRelay import bloodhound
+
+        for created in bloodhound.write(os.path.join(out_dir, "bloodhound"), inventory):
+            written.append(created)
+    except Exception as bloodhound_error:  # never fail the whole export for this
+        print(f"bloodhound export skipped: {bloodhound_error}")
+
     _write_json(path("summary.json"), {"inventory": inventory, "leads": leads})
     _write_json(
         path("leads.json"),
