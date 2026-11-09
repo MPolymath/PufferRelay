@@ -132,6 +132,7 @@ def test_write_exports_pack():
             "summary.json",
             "leads.json",
             "leads.md",
+            "agent-prompt.md",
         ]:
             assert os.path.exists(os.path.join(out, name)), name
 
@@ -146,6 +147,10 @@ def test_write_exports_pack():
         assert "ACTIVE" in briefing
         assert "hashcat -m 5600" in briefing
         assert "10.0.0.10" in briefing
+        with open(os.path.join(out, "agent-prompt.md"), encoding="utf-8") as handle:
+            prompt = handle.read()
+        assert "ACTIVE" in prompt
+        assert "leads.json" in prompt
 
         with open(os.path.join(out, "credentials.csv"), newline="", encoding="utf-8") as handle:
             rows = list(csv.DictReader(handle))

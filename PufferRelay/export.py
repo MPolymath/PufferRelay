@@ -369,6 +369,36 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
 # Leads for an AI agent (or a human deciding what to attack next)
 # --------------------------------------------------------------------------- #
 
+AGENT_PROMPT = """You are supporting an authorised penetration test. The operator
+captured network traffic passively and PufferRelay extracted the findings in
+this folder. Work only from these files; do not invent targets.
+
+Inputs
+- leads.json   machine-readable leads + full inventory (schema version 1)
+- leads.md     the same leads as a briefing with evidence and commands
+- hosts.tsv    ip, hostnames, MACs, port=service
+- users.txt    identities (DOMAIN/user when known)
+- credentials.csv, ntlm-hashes.txt, nmap-targets.txt, nmap-command.txt
+
+Rules
+1. Evidence first: every recommendation must cite the lead id and its evidence
+   from leads.json. Do not suggest attacking a host that is not in the pack.
+2. ACTIVE actions (leads[].suggested_actions[].active == true) send traffic or
+   use captured secrets. Never run them and never present them as safe:
+   - ask the operator to confirm the target is in scope,
+   - warn about lockouts, IDS/IPS and service disruption,
+   - prefer the least invasive check that answers the question.
+3. Passive work can be done immediately: cracking NTLM offline, reading the
+   inventories, ranking hosts, writing the report narrative.
+4. Prioritise by impact: critical > high > medium > low, then by how directly
+   the lead enables domain or host compromise (relay, reused credentials, hashes).
+5. Produce a short plan: for each of the top leads, the hypothesis, the exact
+   command (marked ACTIVE/passive), what result would confirm it, and the
+   cleanup/rollback. Keep commands copy-paste ready for the operator.
+6. Never claim a vulnerability is confirmed from traffic alone; say what the
+   capture proves and what needs verification.
+"""
+
 QUICK_WIN_SEVERITY = {
     "SMB_SIGNING_MISSING": ("critical", "SMB signing disabled -> NTLM relay to SMB is possible"),
     "LDAP_SIGNING_MISSING": ("high", "LDAP signing/channel binding not enforced -> relay to LDAP"),
@@ -854,5 +884,6 @@ def write_exports(
         },
     )
     _write_text(path("leads.md"), leads_to_markdown(inventory, leads, pcap_name).splitlines())
+    _write_text(path("agent-prompt.md"), AGENT_PROMPT.splitlines())
 
     return written

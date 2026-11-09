@@ -15,6 +15,7 @@ pufferrelay -r --dump out                       # from an existing database
 |---|---|---|
 | `leads.json` | AI agent / automation | `schema`, `tool`, `generated_at`, `pcap`, `summary`, ranked `leads[]`, full `inventory` |
 | `leads.md` | AI agent / human | same leads as a briefing: severity, why, evidence, copy-paste commands, ACTIVE warnings, then compact host/user/credential/hash lists |
+| `agent-prompt.md` | AI agent | ready-to-paste system/task prompt describing the inputs, the evidence rule, the ACTIVE-action confirmation rule, and the expected output (ranked plan with commands) |
 
 `leads.json` shape:
 

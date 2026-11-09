@@ -10,7 +10,8 @@ status board.
 - [x] `docs/PLAN.md` — every issue triaged, ROI tiers, risk classes.
 - [x] `docs/OUTPUTS.md` — export pack + agent feed schema (#42, #58, #63).
 - [x] `PufferRelay/export.py` — inventories, nmap targets, credentials/hashes,
-      `leads.json` + `leads.md` agent briefing (#42, #54, #58, #63).
+      `leads.json` + `leads.md` agent briefing + `agent-prompt.md` (#42, #54,
+      #58, #63).
 - [x] CLI: `--dump`, `--only`, `--credentials-only`, `--json`, `--creds`,
       `--inventory` (#48, #40 partial).
 - [x] Observed services handler + `observed_services` table (#54).
