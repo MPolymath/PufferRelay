@@ -70,6 +70,10 @@ Rules an agent must follow when consuming it:
 | `asrep-hashes.txt` | AS-REP roastable accounts | `hashcat -m 18200` |
 | `relay-targets.txt` | destination IPs that accept relayed NTLM | `ntlmrelayx.py -tf` |
 | `relays.tsv` | src, dst, port, protocol, username, signing, candidate | relay planning / report |
+| `smb-shares.txt` | host + share + type (share/printer) | lateral movement targets |
+| `smb-files.txt` | host, share, file name, operation | data accessed over SMB |
+| `files.tsv` | sha256, size, type, protocol, src, dst, name, path | index of carved objects |
+| `files/` | the carved objects themselves | **client data**, local only |
 | `summary.json` | inventory + leads | dashboards, diffing runs |
 
 ## CLI filters (issue #48)

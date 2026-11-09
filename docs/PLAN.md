@@ -98,6 +98,9 @@ Everything else follows the table above; do Tier S completely before Tier A.
 | `3f1a7d9` | #61 AS-REP roasting detection (hashcat 18200, `asrep-hashes.txt`, ASREP leads) |
 | `03ca4c9` | #62 relay scenarios (SMB2 signing flags + NTLM over SMB/LDAP/HTTP, `relay-targets.txt`, RELAY leads) |
 | `1b0d7c8` | relay signing findings feed the SMB_SIGNING_MISSING quick win |
+| `3c9c7d8` | capture-confidentiality rules (`docs/PRIVACY.md`) + local-only smoke script |
+| `e885117` | #44 SMB shares/files + NTLM-inside-SMB relay fallback |
+| (next) | #57 file carving from HTTP/FTP |
 
 Test status: 26 pytest tests passing locally and in CI (tshark installed),
 including a synthetic-pcap end-to-end and a CLI subprocess test. Every feature

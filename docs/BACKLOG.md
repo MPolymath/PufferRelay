@@ -27,8 +27,9 @@ status board.
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM
       over SMB/LDAP/HTTP; relay-targets.txt + RELAY leads).
-- [ ] #44 SMB extraction (shares, files, users, signing).
-- [ ] #57 file carving from HTTP/SMB/FTP streams.
+- [x] #44 SMB extraction (shares, file names, printer shares; schema v6).
+- [x] #57 file carving from HTTP responses and FTP-DATA (schema v7,
+      `files/` + `files.tsv`); SMB content carving is future work.
 - [ ] #15 BloodHound JSON export from captured identities/sessions.
 - [ ] #39 quick-win severity + evidence upgrade.
 - [ ] Tier B (network actions) with warnings: #27, #16, #13, #60.

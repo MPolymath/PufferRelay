@@ -165,6 +165,21 @@ def create_database(db_path=None):
             )
         """)
 
+        # Create carved file objects (issue #57)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS captured_files (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                protocol TEXT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                filename TEXT,
+                content_type TEXT,
+                size INTEGER,
+                sha256 TEXT UNIQUE,
+                data BLOB
+            )
+        """)
+
         # Create SMB share/file activity (issue #44)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS smb_activity (

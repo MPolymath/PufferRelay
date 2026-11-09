@@ -33,6 +33,7 @@ from .services_handler import process_services
 from .kerberos_handler import process_kerberos
 from .relay_handler import process_relays
 from .smb_handler import process_smb
+from .files_handler import process_files
 
 __all__ = [
     'process_ldap',
@@ -49,5 +50,6 @@ __all__ = [
     'process_services',
     'process_kerberos',
     'process_relays',
-    'process_smb'
+    'process_smb',
+    'process_files'
 ]

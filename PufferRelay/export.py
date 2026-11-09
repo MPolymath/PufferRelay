@@ -427,6 +427,31 @@ def collect_smb(conn: sqlite3.Connection) -> Dict:
     return {"shares": shares, "files": files}
 
 
+def collect_files(conn: sqlite3.Connection) -> List[Dict]:
+    """Metadata of carved files (no payload; the BLOBs are written separately)."""
+    if not _has_table(conn, "captured_files"):
+        return []
+    out = []
+    for protocol, src, dst, filename, content_type, size, digest in _rows(
+        conn,
+        "SELECT protocol, src_ip, dst_ip, filename, content_type, size, sha256 "
+        "FROM captured_files",
+    ):
+        out.append(
+            {
+                "protocol": protocol or "",
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "filename": filename or "",
+                "content_type": content_type or "",
+                "size": size or 0,
+                "sha256": digest or "",
+                "stored_as": f"{(digest or '')[:12]}_{filename or 'object'}",
+            }
+        )
+    return out
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
     return {
         "hosts": collect_hosts(conn),
@@ -436,6 +461,7 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "quick_wins": collect_quick_wins(conn),
         "relays": collect_relays(conn),
         "smb": collect_smb(conn),
+        "files": collect_files(conn),
     }
 
 
@@ -749,6 +775,56 @@ def build_leads(inventory: Dict) -> List[Dict]:
                         f"\"{row['file']}\"' -T fields -e data.data",
                         "active": False,
                         "warning": "Reads the capture only; no traffic.",
+                    }
+                ],
+            }
+        )
+
+    # 3a-ter. Carved files whose names/types suggest sensitive content.
+    suspicious_types = {
+        "application/json",
+        "application/xml",
+        "text/xml",
+        "application/zip",
+        "application/x-7z-compressed",
+        "application/x-rar-compressed",
+        "application/pdf",
+        "application/octet-stream",
+    }
+    for i, item in enumerate(
+        [
+            f
+            for f in inventory.get("files", [])
+            if interesting_file(f["filename"])
+            or (f["content_type"] or "").split(";")[0].strip().lower() in suspicious_types
+        ],
+        start=1,
+    ):
+        add(
+            {
+                "id": f"FILE-{i:03d}",
+                "severity": "high",
+                "title": f"File captured from {item['protocol']}: {item['filename']}",
+                "why": "A file transferred in clear text was carved from the capture. "
+                "Its name or type suggests configuration, credentials or archives. "
+                "Read it locally to decide the next step.",
+                "evidence": {
+                    "protocol": item["protocol"],
+                    "source_ip": item["source_ip"],
+                    "destination_ip": item["destination_ip"],
+                    "filename": item["filename"],
+                    "content_type": item["content_type"],
+                    "size": item["size"],
+                    "sha256": item["sha256"],
+                    "stored_as": item["stored_as"],
+                },
+                "suggested_actions": [
+                    {
+                        "intent": "Inspect the carved object locally (passive)",
+                        "command": f"file files/{item['stored_as']} && "
+                        f"sha256sum files/{item['stored_as']}",
+                        "active": False,
+                        "warning": "Local file only; it contains client data.",
                     }
                 ],
             }
@@ -1108,6 +1184,29 @@ def write_exports(
         }
     )
     _write_text(path("smb-files.txt"), file_lines)
+
+    # Carved file objects (issue #57). These are client data: they stay in the
+    # local export directory and are never uploaded by the tool.
+    files_dir = os.path.join(out_dir, "files")
+    os.makedirs(files_dir, exist_ok=True)
+    written.append(files_dir)
+    file_entries = []
+    if _has_table(conn, "captured_files"):
+        for protocol, src, dst, filename, content_type, size, digest, blob in _rows(
+            conn,
+            "SELECT protocol, src_ip, dst_ip, filename, content_type, size, sha256, data "
+            "FROM captured_files",
+        ):
+            stored = f"{(digest or '')[:12]}_{filename or 'object'}"
+            target = os.path.join(files_dir, stored)
+            if blob is not None:
+                with open(target, "wb") as handle:
+                    handle.write(bytes(blob))
+            file_entries.append(
+                f"{digest}	{size}	{content_type or '-'}	{protocol}	"
+                f"{src}	{dst}	{filename}	files/{stored}"
+            )
+    _write_text(path("files.tsv"), file_entries)
 
     _write_json(path("summary.json"), {"inventory": inventory, "leads": leads})
     _write_json(

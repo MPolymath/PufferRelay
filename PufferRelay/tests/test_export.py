@@ -134,6 +134,7 @@ def test_write_exports_pack():
             "relays.tsv",
             "smb-shares.txt",
             "smb-files.txt",
+            "files.tsv",
             "summary.json",
             "leads.json",
             "leads.md",

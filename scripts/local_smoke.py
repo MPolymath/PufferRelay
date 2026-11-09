@@ -40,6 +40,8 @@ TABLES = [
     "observed_services",
     "kerberos_asrep",
     "relay_scenarios",
+    "smb_activity",
+    "captured_files",
 ]
 
 # Tables that hold sensitive values; report only row counts, never samples.
@@ -129,6 +131,8 @@ def main() -> int:
             ("netbios_requests", "hostname", "netbios_rows_with_hostname"),
             ("kerberos_asrep", "hash", "asrep_rows"),
             ("relay_scenarios", "candidate", "relay_candidate_rows"),
+            ("smb_activity", "share", "smb_share_rows"),
+            ("captured_files", "sha256", "carved_file_rows"),
         ]:
             try:
                 cursor.execute(
