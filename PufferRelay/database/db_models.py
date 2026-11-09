@@ -263,6 +263,23 @@ def create_database(db_path=None):
             )
         """)
 
+        # ASRepCatcher-compatible Kerberos/ARP activity (passive detection).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS asrepcatcher_findings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                client_ip TEXT,
+                attacker_ip TEXT,
+                kdc_ip TEXT,
+                username TEXT,
+                realm TEXT,
+                summary TEXT,
+                evidence TEXT,
+                UNIQUE(kind, client_ip, attacker_ip, kdc_ip, username, summary)
+            )
+        """)
+
         # DNS queries/answers observed in the capture (issues #11 / #59).
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS dns_events (

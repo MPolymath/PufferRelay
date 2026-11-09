@@ -38,6 +38,7 @@ from PufferRelay.protocols import (
     process_nac,
     process_wsus,
     process_dns,
+    process_asrepcatcher,
 )
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
@@ -65,6 +66,7 @@ HANDLERS = {
     "nac": process_nac,
     "wsus": process_wsus,
     "dns": process_dns,
+    "asrepcatcher": process_asrepcatcher,
     "services": process_services,
     "ips": process_ips,
 }

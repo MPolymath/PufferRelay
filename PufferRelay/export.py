@@ -22,6 +22,7 @@ from collections import defaultdict
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 from PufferRelay.protocols.helpers import interesting_file
+from PufferRelay.protocols.asrepcatcher import REFERENCE as ASREPCATCHER_REFERENCE
 
 EXPORT_SCHEMA = 1
 
@@ -576,6 +577,37 @@ def collect_dns(conn: sqlite3.Connection) -> List[Dict]:
     return out
 
 
+def collect_asrepcatcher(conn: sqlite3.Connection) -> List[Dict]:
+    """ASRepCatcher-compatible activity observed in the capture."""
+    out = []
+    if not _has_table(conn, "asrepcatcher_findings"):
+        return out
+    for row in _rows(
+        conn,
+        "SELECT kind, severity, client_ip, attacker_ip, kdc_ip, username, realm, "
+        "summary, evidence FROM asrepcatcher_findings",
+    ):
+        kind, severity, client, attacker, kdc, user, realm, summary, evidence = row
+        try:
+            parsed = json.loads(evidence) if evidence else {}
+        except (TypeError, ValueError):
+            parsed = {}
+        out.append(
+            {
+                "kind": kind or "",
+                "severity": severity or "high",
+                "client_ip": client or "",
+                "attacker_ip": attacker or "",
+                "kdc_ip": kdc or "",
+                "username": user or "",
+                "realm": realm or "",
+                "summary": summary or "",
+                "evidence": parsed,
+            }
+        )
+    return out
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
     return {
         "hosts": collect_hosts(conn),
@@ -589,6 +621,7 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "nac": collect_nac(conn),
         "wsus": collect_wsus(conn),
         "dns": collect_dns(conn),
+        "asrepcatcher": collect_asrepcatcher(conn),
     }
 
 
@@ -811,6 +844,36 @@ def build_leads(inventory: Dict) -> List[Dict]:
                         "active": True,
                         "warning": "Active: authenticates to the DC. Confirm scope and "
                         "lockout policy.",
+                    },
+                ],
+            }
+        )
+
+    # 3b. ASRepCatcher-compatible Kerberos activity (passive detection).
+    for i, finding in enumerate(inventory.get("asrepcatcher", []), start=1):
+        add(
+            {
+                "id": f"ASREPCATCHER-{i:03d}",
+                "severity": finding.get("severity") or "high",
+                "title": f"ASRepCatcher-compatible activity: {finding['kind']}",
+                "why": finding["summary"]
+                + " This matches the ASRepCatcher technique "
+                f"({ASREPCATCHER_REFERENCE}): ARP/relay harvesting of AS-REP "
+                "material without requiring pre-authentication to be disabled. "
+                "The capture shows the traffic shape; verify before acting.",
+                "evidence": {**finding, "reference": ASREPCATCHER_REFERENCE},
+                "suggested_actions": [
+                    {
+                        "intent": "Review the Kerberos/ARP frames around this finding",
+                        "command": "tshark -r <capture> -Y 'kerberos || arp'",
+                        "active": False,
+                        "warning": "Read-only; no traffic is sent.",
+                    },
+                    {
+                        "intent": "Read the attack description and detection notes",
+                        "command": f"open {ASREPCATCHER_REFERENCE}",
+                        "active": False,
+                        "warning": "Documentation only.",
                     },
                 ],
             }
@@ -1399,6 +1462,18 @@ def write_exports(
                 f"{row['query']}	{row['type']}	{row['answer'] or '-'}	"
                 f"{row['source_ip']}	{row['destination_ip']}"
                 for row in dns
+            }
+        ),
+    )
+    catcher = inventory.get("asrepcatcher", [])
+    _write_text(
+        path("asrepcatcher.txt"),
+        sorted(
+            {
+                f"{row['kind']}	{row['severity']}	{row['client_ip'] or '-'}	"
+                f"{row['attacker_ip'] or '-'}	{row['kdc_ip'] or '-'}	"
+                f"{row['username'] or '-'}	{row['realm'] or '-'}	{row['summary']}"
+                for row in catcher
             }
         ),
     )

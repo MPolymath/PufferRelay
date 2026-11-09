@@ -73,6 +73,7 @@ Rules an agent must follow when consuming it:
 | `smb-shares.txt` | host + share + type (share/printer) | lateral movement targets |
 | `smb-files.txt` | host, share, file name, operation | data accessed over SMB |
 | `dns.txt` | query, type, answer, src, dst | passive name↔IP map |
+| `asrepcatcher.txt` | kind, severity, client, attacker, KDC, user, realm, summary | Kerberos attack pattern; leads carry the repo link |
 | `files.tsv` | sha256, size, type, protocol, src, dst, name, path | index of carved objects |
 | `files/` | the carved objects themselves | **client data**, local only |
 | `bloodhound/users.json`, `computers.json` | SharpHound Legacy JSON built from observed users/hosts/sessions | import as leads (no SIDs/ACLs) |

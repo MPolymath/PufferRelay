@@ -180,6 +180,16 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} AS-REP candidates")
+        elif protocol == "asrepcatcher":
+            # (kind, severity, client_ip, attacker_ip, kdc_ip, username, realm,
+            #  summary, evidence_json)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO asrepcatcher_findings
+                    (kind, severity, client_ip, attacker_ip, kdc_ip, username,
+                     realm, summary, evidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} ASRepCatcher findings")
         elif protocol == "dns":
             # (src_ip, dst_ip, query_name, query_type, answer, is_response)
             cursor.executemany("""
@@ -267,6 +277,9 @@ PROTOCOL_TABLES = {
     "ips": ("ip_requests", ["subnet", "ip"]),
     "dns": ("dns_events",
             ["src_ip", "dst_ip", "query_name", "query_type", "answer"]),
+    "asrepcatcher": ("asrepcatcher_findings",
+                     ["kind", "severity", "client_ip", "attacker_ip", "kdc_ip",
+                      "username", "realm", "summary"]),
 }
 
 

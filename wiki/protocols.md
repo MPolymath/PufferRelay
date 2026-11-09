@@ -68,6 +68,20 @@ narrow: a capture proves traffic, not intent.
 - Proves: update infrastructure endpoints seen in traffic.
 - Limit: WSUS approval state and content integrity are not visible.
 
+## ASRepCatcher-compatible activity
+- One pass over `kerberos || arp` frames: AS-REQ/AS-REP message type, account,
+  realm, etype, padata types, plus ARP reply sender IP/MAC.
+- Proves a traffic shape, not intent: the same account requesting a TGT from
+  two source addresses (relayed AS-REQ), a crackable AS-REP delivered to a host
+  that never requested it, an IPv4 address announced by two MACs (ARP
+  spoofing), or a burst of pre-auth-less TGT requests.
+- When ARP spoofing and a Kerberos relay/diversion signal overlap, the finding
+  is raised to **critical** and links
+  <https://github.com/Yaxxine7/ASRepCatcher>, the tool that uses this technique.
+- Limit: partial captures (started after the request) cannot correlate a
+  reply; the detector only reports a diverted reply when another host did send
+  the matching AS-REQ.
+
 ## DNS
 - `dns` frames: `dns.qry.name`, `dns.qry.type`, `dns.flags.response`, `dns.a`,
   `dns.aaaa`.

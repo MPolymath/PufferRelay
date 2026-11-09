@@ -74,6 +74,7 @@ PufferRelay/
     nac_handler.py       EAP/RADIUS (802.1X/MAB) observations
     wsus_handler.py      WSUS/Windows Update endpoints
     dns_handler.py       DNS queries/answers (name↔IP map)
+    asrepcatcher.py      ASRepCatcher-compatible ARP/Kerberos pattern
     quick_wins.py        regex sweep over every packet for "quick win" flags
   database/
     db_models.py         CREATE TABLE IF NOT EXISTS + quick_wins seed
@@ -82,7 +83,7 @@ PufferRelay/
   utils/
     display.py           Rich tables/panels
     loading_animation.py spinner + READY banner
-  tests/                 pytest suite (87 tests: pure, DB, e2e pcap, CLI, relay)
+  tests/                 pytest suite (95 tests: pure, DB, e2e pcap, CLI, relay)
 ```
 
 Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->

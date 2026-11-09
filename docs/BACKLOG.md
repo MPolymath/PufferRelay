@@ -27,6 +27,9 @@ status board.
       host inventory enrichment).
 - [x] #40 query filters: `-r --ip`, `--user`, `--has-creds`, `--table`,
       `--limit` (tables that cannot satisfy a filter are skipped).
+- [x] ASRepCatcher-compatible detection: ARP spoofing + relayed AS-REQ /
+  diverted crackable AS-REP; critical when both overlap; leads and
+  `asrepcatcher.txt` link <https://github.com/Yaxxine7/ASRepCatcher>.
 - [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM

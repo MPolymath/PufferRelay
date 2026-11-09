@@ -135,6 +135,7 @@ def test_write_exports_pack():
             "smb-shares.txt",
             "smb-files.txt",
             "dns.txt",
+            "asrepcatcher.txt",
             "files.tsv",
             "summary.json",
             "leads.json",

@@ -10,6 +10,7 @@
 | Hosts | IP inventory grouped by /24, NetBIOS/DNS names and MACs, observed TCP services |
 | DNS | queries/answers (A, AAAA, PTR, ...), name↔IP map, `dns.txt` |
 | AD | SMB share/file names, printer shares, relay candidates (SMB signing flags + NTLM over SMB/LDAP/HTTP) |
+| Kerberos attacks | ASRepCatcher-compatible ARP/relay pattern (critical when both signals overlap), AS-REP roastable accounts |
 | Clear text | HTTP/FTP file objects carved with sha256, HTTP WSUS endpoints |
 | Weakness | quick wins: SMBv1, SMB signing, LDAP signing, SNMPv1/v2, SSLv2/v3, TLS1.0, LLMNR/NBT-NS/mDNS, cleartext protocols |
 
@@ -18,7 +19,8 @@
 `ips.txt`, `subnets.txt`, `users.txt`, `hosts.tsv`, `nmap-targets.txt`,
 `nmap-command.txt`, `credentials.csv`, `ntlm-hashes.txt`, `asrep-hashes.txt`,
 `relay-targets.txt`, `relays.tsv`, `smb-shares.txt`, `smb-files.txt`,
-`wsus.txt`, `nac.txt`, `dns.txt`, `files.tsv` + `files/`, `bloodhound/`, `summary.json`.
+`wsus.txt`, `nac.txt`, `dns.txt`, `asrepcatcher.txt`, `files.tsv` + `files/`,
+`bloodhound/`, `summary.json`.
 
 ## Agent feed
 

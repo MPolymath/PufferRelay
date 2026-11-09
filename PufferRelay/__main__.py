@@ -173,7 +173,8 @@ def main():
     parser.add_argument(
         "--only",
         help="Run only these handlers, comma separated "
-        "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,services,dns,ips)",
+        "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,services,dns,"
+        "asrepcatcher,ips)",
     )
     parser.add_argument(
         "--credentials-only",
@@ -213,7 +214,8 @@ def main():
     parser.add_argument(
         "--protocol",
         help="With -r: show the raw rows of these protocols "
-        "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,services,dns,ips)",
+        "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,services,dns,"
+        "asrepcatcher,ips)",
     )
     parser.add_argument(
         "--ip",
@@ -463,6 +465,34 @@ def main():
                     credentials_only=args.credentials_only,
                 )
                 process_extracted_data(parsed_data)
+
+                # ASRepCatcher-compatible traffic is worth interrupting the
+                # operator for: it means Kerberos hashes may already be leaving
+                # the segment. Passive finding; we only print the reference.
+                catcher = parsed_data.get("asrepcatcher") or []
+                if catcher:
+                    from PufferRelay.protocols.asrepcatcher import REFERENCE
+
+                    summary = (
+                        f"[bold]{len(catcher)} ASRepCatcher-compatible "
+                        "finding(s) in this capture[/bold]\n"
+                        "Review the evidence in the lead feed before acting.\n"
+                        f"Technique: {REFERENCE}"
+                    )
+                    if machine:
+                        print(
+                            f"ASREPCATCHER: {len(catcher)} finding(s); "
+                            f"see leads.json; {REFERENCE}",
+                            file=sys.stderr,
+                        )
+                    else:
+                        rprint(
+                            Panel(
+                                summary,
+                                title="[bold red]Kerberos attack pattern detected[/bold red]",
+                                border_style="red",
+                            )
+                        )
 
                 # Relay findings feed the SMB-signing quick win so it shows up
                 # in every view (table, report, agent feed).

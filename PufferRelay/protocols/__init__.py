@@ -39,6 +39,7 @@ from .files_handler import process_files
 from .nac_handler import process_nac
 from .wsus_handler import process_wsus
 from .dns_handler import process_dns
+from .asrepcatcher import process_asrepcatcher
 
 __all__ = [
     'process_ldap',
@@ -59,5 +60,6 @@ __all__ = [
     'process_files',
     'process_nac',
     'process_wsus',
-    'process_dns'
+    'process_dns',
+    'process_asrepcatcher'
 ]
