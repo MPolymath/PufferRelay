@@ -37,8 +37,10 @@ from PufferRelay.database.db_queries import (
     display_table,
     fetch_all_data,
     fetch_protocol,
+    fetch_table,
     protocol_headers,
     process_extracted_data,
+    query_tables,
     update_quick_win,
 )
 from PufferRelay.protocols.quick_wins import analyze_quick_wins
@@ -171,7 +173,7 @@ def main():
     parser.add_argument(
         "--only",
         help="Run only these handlers, comma separated "
-        "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,services,ips)",
+        "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,services,dns,ips)",
     )
     parser.add_argument(
         "--credentials-only",
@@ -211,7 +213,33 @@ def main():
     parser.add_argument(
         "--protocol",
         help="With -r: show the raw rows of these protocols "
-        "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,services,ips)",
+        "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,services,dns,ips)",
+    )
+    parser.add_argument(
+        "--ip",
+        metavar="ADDRESS",
+        help="With -r: only rows where this IP appears (source or destination)",
+    )
+    parser.add_argument(
+        "--user",
+        metavar="NAME",
+        help="With -r: only rows for this identity (username/name)",
+    )
+    parser.add_argument(
+        "--has-creds",
+        action="store_true",
+        help="With -r: only rows carrying a credential or a hash",
+    )
+    parser.add_argument(
+        "--table",
+        metavar="NAME",
+        help="With -r: raw dump of one table (e.g. dns_events, quick_wins)",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=500,
+        help="Max rows per table for -r filters (default 500)",
     )
     parser.add_argument(
         "--log-level",
@@ -307,6 +335,10 @@ def main():
     setup_logger(getattr(logging, args.log_level or settings["log_level"]))
 
     machine = bool(args.json or args.creds or args.inventory)
+
+    # Query filters imply reading an existing database.
+    if args.ip or args.user or args.has_creds or args.table:
+        args.read = True
 
     # ---- active modes: explicit, warned, confirmed, never default -----
     if args.proxy is not None:
@@ -454,19 +486,56 @@ def main():
                     show_ready(quick_wins=False)
                     logging.info("\033[35mPufferRelay Ready...\033[0m")
                     fetch_all_data(conn)
-            elif args.read and args.protocol:
-                for name in [p.strip().lower() for p in args.protocol.split(",") if p.strip()]:
-                    rows = fetch_protocol(conn, name)
+            elif args.read and (
+                args.protocol or args.ip or args.user or args.has_creds or args.table
+            ):
+                if args.table:
+                    headers, rows = fetch_table(conn, args.table, limit=args.limit)
                     if not rows:
-                        print(f"(no rows for {name})")
-                        continue
-                    headers = protocol_headers(name)
-                    if machine:
-                        print("	".join(headers))
+                        print(f"(no rows for {args.table})")
+                    elif machine:
+                        print("\t".join(headers))
                         for row in rows:
-                            print("	".join(str(value) for value in row))
+                            print("\t".join(str(value) for value in row))
                     else:
-                        display_table(rows, headers, name.upper())
+                        display_table(rows, headers, args.table.upper())
+                elif args.protocol and not (args.ip or args.user or args.has_creds):
+                    for name in [p.strip().lower() for p in args.protocol.split(",") if p.strip()]:
+                        rows = fetch_protocol(conn, name)
+                        if not rows:
+                            print(f"(no rows for {name})")
+                            continue
+                        headers = protocol_headers(name)
+                        if machine:
+                            print("\t".join(headers))
+                            for row in rows:
+                                print("\t".join(str(value) for value in row))
+                        else:
+                            display_table(rows, headers, name.upper())
+                else:
+                    protocols = (
+                        [p.strip().lower() for p in args.protocol.split(",") if p.strip()]
+                        if args.protocol
+                        else None
+                    )
+                    results = query_tables(
+                        conn,
+                        ip=args.ip,
+                        user=args.user,
+                        has_creds=args.has_creds,
+                        protocols=protocols,
+                        limit=args.limit,
+                    )
+                    if not results:
+                        print("(no matching rows)")
+                    for name, rows in results:
+                        headers = protocol_headers(name)
+                        if machine:
+                            print("\t".join(headers))
+                            for row in rows:
+                                print("\t".join(str(value) for value in row))
+                        else:
+                            display_table(rows, headers, name.upper())
             elif args.read:
                 if args.quick_wins:
                     if not machine:
@@ -477,7 +546,9 @@ def main():
                     logging.info("\033[35mPufferRelay Ready...\033[0m")
                     fetch_all_data(conn)
 
-            if machine and not args.protocol:
+            if machine and not (
+                args.protocol or args.ip or args.user or args.has_creds or args.table
+            ):
                 inventory = export.collect_inventory(conn)
                 leads = export.build_leads(inventory)
                 _print_machine_output(args, inventory, leads)

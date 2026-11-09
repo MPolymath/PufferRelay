@@ -38,6 +38,7 @@ from .services_handler import process_services
 from .files_handler import process_files
 from .nac_handler import process_nac
 from .wsus_handler import process_wsus
+from .dns_handler import process_dns
 
 __all__ = [
     'process_ldap',
@@ -57,5 +58,6 @@ __all__ = [
     'process_smb',
     'process_files',
     'process_nac',
-    'process_wsus'
+    'process_wsus',
+    'process_dns'
 ]

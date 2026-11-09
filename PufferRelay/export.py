@@ -325,8 +325,30 @@ def _ip_key(ip: str):
         return (1, 0)
 
 
+def _looks_like_ip(value: str) -> bool:
+    try:
+        from ipaddress import ip_address
+
+        ip_address(value)
+        return True
+    except ValueError:
+        return False
+
+
+def _ptr_to_ip(name: str) -> str:
+    """'5.0.0.10.in-addr.arpa' -> '10.0.0.5'; '' for anything else."""
+    labels = (name or "").rstrip(".").split(".")
+    if len(labels) < 6 or labels[-2:] != ["in-addr", "arpa"]:
+        return ""
+    try:
+        octets = [str(int(label)) for label in labels[:4]]
+    except ValueError:
+        return ""
+    return ".".join(reversed(octets))
+
+
 def collect_hosts(conn: sqlite3.Connection) -> List[Dict]:
-    """IPs from ip_requests, enriched with NetBIOS names, MACs and services."""
+    """IPs from ip_requests, enriched with NetBIOS/DNS names, MACs and services."""
     names: Dict[str, Set[str]] = defaultdict(set)
     macs: Dict[str, Set[str]] = defaultdict(set)
     for row in _rows(conn, "SELECT hostname, src_ip, src_mac FROM netbios_requests"):
@@ -336,6 +358,22 @@ def collect_hosts(conn: sqlite3.Connection) -> List[Dict]:
                 names[ip].add(hostname)
             if mac and mac != "N/A":
                 macs[ip].add(mac)
+
+    # DNS answers tie a name to an IP without sending a query (issues #11/#59).
+    if _has_table(conn, "dns_events"):
+        for qname, answer in _rows(
+            conn, "SELECT query_name, answer FROM dns_events WHERE answer != ''"
+        ):
+            name = (qname or "").strip(".")
+            value = (answer or "").strip(".")
+            if not name or not value:
+                continue
+            if _looks_like_ip(value):
+                names[value].add(name)
+            elif name.endswith("in-addr.arpa"):
+                ptr_ip = _ptr_to_ip(name)
+                if ptr_ip:
+                    names[ptr_ip].add(value)
 
     ports: Dict[str, Set[Tuple[int, str]]] = defaultdict(set)
     if _has_table(conn, "observed_services"):
@@ -515,6 +553,29 @@ def collect_wsus(conn: sqlite3.Connection) -> List[Dict]:
     return out
 
 
+def collect_dns(conn: sqlite3.Connection) -> List[Dict]:
+    """DNS queries/answers observed in the capture (issues #11/#59)."""
+    out = []
+    if not _has_table(conn, "dns_events"):
+        return out
+    for src, dst, name, qtype, answer, is_response in _rows(
+        conn,
+        "SELECT src_ip, dst_ip, query_name, query_type, answer, is_response "
+        "FROM dns_events",
+    ):
+        out.append(
+            {
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "query": name or "",
+                "type": qtype or "",
+                "answer": answer or "",
+                "is_response": bool(is_response),
+            }
+        )
+    return out
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
     return {
         "hosts": collect_hosts(conn),
@@ -527,6 +588,7 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "files": collect_files(conn),
         "nac": collect_nac(conn),
         "wsus": collect_wsus(conn),
+        "dns": collect_dns(conn),
     }
 
 
@@ -1326,6 +1388,17 @@ def write_exports(
                 f"{row['destination_ip']}	{row['host'] or '-'}	{row['indicator']}	"
                 f"{row['uri']}"
                 for row in wsus
+            }
+        ),
+    )
+    dns = inventory.get("dns", [])
+    _write_text(
+        path("dns.txt"),
+        sorted(
+            {
+                f"{row['query']}	{row['type']}	{row['answer'] or '-'}	"
+                f"{row['source_ip']}	{row['destination_ip']}"
+                for row in dns
             }
         ),
     )

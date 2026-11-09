@@ -68,6 +68,14 @@ narrow: a capture proves traffic, not intent.
 - Proves: update infrastructure endpoints seen in traffic.
 - Limit: WSUS approval state and content integrity are not visible.
 
+## DNS
+- `dns` frames: `dns.qry.name`, `dns.qry.type`, `dns.flags.response`, `dns.a`,
+  `dns.aaaa`.
+- Proves: which names were resolved and to which addresses (A/AAAA/PTR), a
+  passive name-to-IP map. A/AAAA answers also enrich `hosts.tsv`.
+- Limit: one answer per row when a response carries several records; DoH/DoT
+  traffic is not DNS and is not parsed here.
+
 ## Files
 - HTTP response bodies and FTP-DATA objects, sha256, size, safe name.
 - Limit: objects split across many TCP segments depend on tshark reassembly.

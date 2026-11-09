@@ -180,6 +180,14 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} AS-REP candidates")
+        elif protocol == "dns":
+            # (src_ip, dst_ip, query_name, query_type, answer, is_response)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO dns_events
+                    (src_ip, dst_ip, query_name, query_type, answer, is_response)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} DNS events")
         elif protocol == "services":
             # (ip, port, service, transport) observed in the capture
             cursor.executemany("""
@@ -257,6 +265,8 @@ PROTOCOL_TABLES = {
                ["src_ip", "dst_ip", "dst_port", "protocol", "username",
                 "signing_required", "candidate"]),
     "ips": ("ip_requests", ["subnet", "ip"]),
+    "dns": ("dns_events",
+            ["src_ip", "dst_ip", "query_name", "query_type", "answer"]),
 }
 
 
@@ -275,6 +285,104 @@ def protocol_headers(protocol):
     if not entry:
         return []
     return ["Protocol"] + [column.replace("_", " ").title() for column in entry[1]]
+
+
+# Columns that hold an address / an identity, used by the -r filters (issue #40).
+IP_COLUMNS = {"source_ip", "destination_ip", "src_ip", "dst_ip", "src", "dst", "ip"}
+USER_COLUMNS = {"username", "ldap_name", "smtp_user", "http_auth_username", "identity"}
+CREDENTIAL_COLUMNS = {
+    "ldap": "ldap_simple",
+    "http": "http_auth_password",
+    "smtp": "smtp_password",
+    "imap": "password",
+    "pop3": "password",
+    "ntlm": "ntlm_hash",
+    "kerberos": "hash",
+}
+TABLE_NAMES = {entry[0] for entry in PROTOCOL_TABLES.values()} | {"quick_wins"}
+
+# FTP keeps the username as the argument of a USER command, not in a column.
+SPECIAL_USER_FILTERS = {
+    "ftp": "(UPPER(ftp_request_command) = 'USER' AND ftp_request_arg = ?)",
+}
+
+
+def _filter_clause(columns, ip=None, user=None, protocol=None):
+    """Return (where, params) or None when the table cannot satisfy a filter."""
+    clauses, params = [], []
+    if ip:
+        matches = [column for column in columns if column in IP_COLUMNS]
+        if not matches:
+            return None
+        clauses.append("(" + " OR ".join(f"{column} = ?" for column in matches) + ")")
+        params.extend([ip] * len(matches))
+    if user:
+        special = SPECIAL_USER_FILTERS.get(protocol or "")
+        if special:
+            clauses.append(special)
+            params.append(user)
+        else:
+            matches = [column for column in columns if column in USER_COLUMNS]
+            if not matches:
+                return None
+            clauses.append("(" + " OR ".join(f"{column} = ?" for column in matches) + ")")
+            params.extend([user] * len(matches))
+    return (" AND ".join(clauses), params)
+
+
+def query_tables(conn, ip=None, user=None, has_creds=False, protocols=None, limit=500):
+    """Filtered raw view behind ``-r --ip`` / ``--user`` / ``--has-creds``.
+
+    Returns ``[(protocol, rows)]`` where each row starts with the protocol
+    label, matching :func:`protocol_headers`. Tables that cannot satisfy a
+    filter are skipped instead of returning misleading empty results.
+    """
+    names = [name.lower() for name in (protocols or list(PROTOCOL_TABLES))]
+    out = []
+    for name in names:
+        entry = PROTOCOL_TABLES.get(name)
+        if not entry:
+            continue
+        table_name, columns = entry
+        secret = CREDENTIAL_COLUMNS.get(name)
+        if has_creds and not secret:
+            continue
+        built = _filter_clause(columns, ip=ip, user=user, protocol=name)
+        if built is None:
+            continue
+        where, params = built
+        if has_creds:
+            clause = (
+                f"{secret} IS NOT NULL AND {secret} != '' AND {secret} != 'N/A'"
+            )
+            where = f"{where} AND {clause}" if where else clause
+        query = f"SELECT '{name}', {', '.join(columns)} FROM {table_name}"
+        if where:
+            query += f" WHERE {where}"
+        query += " LIMIT ?"
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, params + [max(1, int(limit))])
+            rows = cursor.fetchall()
+        except sqlite3.Error:
+            continue
+        if rows:
+            out.append((name, rows))
+    return out
+
+
+def fetch_table(conn, table_name, limit=500):
+    """Raw ``SELECT *`` for ``-r --table``; returns (headers, rows)."""
+    if table_name not in TABLE_NAMES:
+        return [], []
+    try:
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info({table_name})")
+        headers = [row[1] for row in cursor.fetchall()]
+        cursor.execute(f"SELECT * FROM {table_name} LIMIT ?", (max(1, int(limit)),))
+        return headers, cursor.fetchall()
+    except sqlite3.Error:
+        return [], []
 
 
 def fetch_requests(conn, table_name, columns, protocol, conditions=None):

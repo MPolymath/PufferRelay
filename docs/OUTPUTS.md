@@ -43,7 +43,7 @@ pufferrelay -r --dump out                       # from an existing database
       "passive": true
     }
   ],
-  "inventory": {"hosts": [], "users": [], "credentials": [], "hashes": [], "quick_wins": []}
+  "inventory": {"hosts": [], "users": [], "credentials": [], "hashes": [], "dns": [], "quick_wins": []}
 }
 ```
 
@@ -72,6 +72,7 @@ Rules an agent must follow when consuming it:
 | `relays.tsv` | src, dst, port, protocol, username, signing, candidate | relay planning / report |
 | `smb-shares.txt` | host + share + type (share/printer) | lateral movement targets |
 | `smb-files.txt` | host, share, file name, operation | data accessed over SMB |
+| `dns.txt` | query, type, answer, src, dst | passive name↔IP map |
 | `files.tsv` | sha256, size, type, protocol, src, dst, name, path | index of carved objects |
 | `files/` | the carved objects themselves | **client data**, local only |
 | `bloodhound/users.json`, `computers.json` | SharpHound Legacy JSON built from observed users/hosts/sessions | import as leads (no SIDs/ACLs) |
@@ -87,6 +88,9 @@ pufferrelay -r --json                                  # inventory + leads as JS
 pufferrelay -r --creds                                 # credential rows only
 pufferrelay -r --inventory                             # hosts/users only
 pufferrelay -r --protocol ftp,ntlm                     # raw rows for those protocols
+pufferrelay -r --ip 10.0.0.5                           # every row touching that IP
+pufferrelay -r --user alice --has-creds                # that identity's secrets
+pufferrelay -r --table dns_events --limit 100          # raw table dump
 pufferrelay -r --protocol ftp --json                  # tab-separated (machine mode)
 ```
 

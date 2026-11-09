@@ -23,6 +23,10 @@ status board.
 
 ## Next (ROI order from PLAN.md)
 
+- [x] #11/#59 DNS extraction (`dns_events`, `dns.txt`, A/AAAA/PTR name↔IP map,
+      host inventory enrichment).
+- [x] #40 query filters: `-r --ip`, `--user`, `--has-creds`, `--table`,
+      `--limit` (tables that cannot satisfy a filter are skipped).
 - [x] #61 AS-REP roasting detection (AS-REQ without PA-ENC-TIMESTAMP ->
       AS-REP -> hashcat 18200; `asrep-hashes.txt`, ASREP leads).
 - [x] #62 relay scenario enumeration (SMB NEGOTIATE signing flags + NTLM

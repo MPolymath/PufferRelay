@@ -57,7 +57,7 @@ pufferrelay -r --dump out <br>
 
 The pack contains `ips.txt`, `subnets.txt`, `users.txt`, `hosts.tsv`,
 `nmap-targets.txt`, `nmap-command.txt`, `credentials.csv`, `ntlm-hashes.txt`,
-`summary.json`, and the agent feed: `leads.json` + `leads.md` (every lead with
+`dns.txt`, `summary.json`, and the agent feed: `leads.json` + `leads.md` (every lead with
 its evidence, suggested next actions, and explicit warnings for anything that
 sends traffic). See [docs/OUTPUTS.md](docs/OUTPUTS.md) and
 [docs/PLAN.md](docs/PLAN.md).
@@ -73,6 +73,9 @@ pufferrelay -r --json <br>
 pufferrelay -r --creds <br>
 pufferrelay -r --inventory <br>
 pufferrelay -r --protocol ftp,ntlm <br>
+pufferrelay -r --ip 10.0.0.5 <br>
+pufferrelay -r --user alice --has-creds <br>
+pufferrelay -r --table dns_events --limit 100 <br>
 
 #### Active modes (opt-in — these send packets)
 Every active mode prints a red warning and requires you to type `authorized`

@@ -108,8 +108,9 @@ Everything else follows the table above; do Tier S completely before Tier A.
 | `b48a82a` | #45 ETA/countdown and #19 JSON config with CLI/env overrides |
 | `458b94c` | #53 cleanup: legacy pyshark handlers removed, helpers module |
 | (this commit) | #27 live capture, #16 local recording relay, #13 ARP/relay command generator, #60 serve-me — all opt-in with warning + authorisation |
+| (next commit) | #11/#59 DNS visibility and host enrichment; #40 `-r --ip/--user/--has-creds/--table/--limit` filters |
 
-Test status: 79 pytest tests passing locally and in CI (tshark installed),
+Test status: 87 pytest tests passing locally and in CI (tshark installed),
 including synthetic-pcap end-to-end, CLI subprocess, loopback relay and
 live-capture command-construction tests. Passive analysis is the default;
 active modes (`--live`, `--proxy`) print a red warning and require explicit

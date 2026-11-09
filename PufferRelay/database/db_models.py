@@ -263,6 +263,20 @@ def create_database(db_path=None):
             )
         """)
 
+        # DNS queries/answers observed in the capture (issues #11 / #59).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dns_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                query_name TEXT,
+                query_type TEXT,
+                answer TEXT,
+                is_response INTEGER,
+                UNIQUE(src_ip, dst_ip, query_name, query_type, answer, is_response)
+            )
+        """)
+
         # Create Quick Wins table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS quick_wins (
