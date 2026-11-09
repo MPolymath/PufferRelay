@@ -123,7 +123,14 @@ Data flow: `parse_pcap()` -> `{protocol: [(...)...]}` ->
   move to targeted filters/fields per protocol.
 - `--read` with no `-f` still creates the DB in cwd; document/guard.
 
-## 8. Where the ideas live
+## 8. Documentation surfaces
+
+- `wiki/` is the GitBook source (getting started, features, protocols, outputs,
+  performance, privacy, FAQ). Update it with every user-visible change.
+- `docs/PLAN.md` is the issue triage; `docs/OUTPUTS.md` the export contract;
+  `docs/PRIVACY.md` the capture rules.
+
+## 9. Where the ideas live
 
 All requested features are GitHub issues on `MPolymath/PufferRelay`.
 `docs/PLAN.md` maps every issue to a work item, an ROI tier, a risk class

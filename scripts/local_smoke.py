@@ -42,6 +42,8 @@ TABLES = [
     "relay_scenarios",
     "smb_activity",
     "captured_files",
+    "nac_events",
+    "wsus_endpoints",
 ]
 
 # Tables that hold sensitive values; report only row counts, never samples.

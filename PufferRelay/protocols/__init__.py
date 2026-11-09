@@ -36,6 +36,8 @@ from .ip_handler import process_ips
 from .ntlm_fast import process_ntlm
 from .services_handler import process_services
 from .files_handler import process_files
+from .nac_handler import process_nac
+from .wsus_handler import process_wsus
 
 __all__ = [
     'process_ldap',
@@ -53,5 +55,7 @@ __all__ = [
     'process_kerberos',
     'process_relays',
     'process_smb',
-    'process_files'
+    'process_files',
+    'process_nac',
+    'process_wsus'
 ]

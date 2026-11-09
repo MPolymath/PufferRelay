@@ -139,6 +139,22 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} carved file objects")
+        elif protocol == "nac":
+            # (kind, identity, src, dst, method, mab)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO nac_events
+                    (kind, identity, src, dst, method, mab)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} NAC observations")
+        elif protocol == "wsus":
+            # (src_ip, dst_ip, host, uri, user_agent, indicator)
+            cursor.executemany("""
+                INSERT OR IGNORE INTO wsus_endpoints
+                    (src_ip, dst_ip, host, uri, user_agent, indicator)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} WSUS endpoints")
         elif protocol == "smb":
             # (src_ip, dst_ip, share, file, operation, printer)
             cursor.executemany("""
@@ -231,6 +247,10 @@ PROTOCOL_TABLES = {
     "files": ("captured_files",
               ["protocol", "src_ip", "dst_ip", "filename", "content_type", "size",
                "sha256"]),
+    "nac": ("nac_events",
+            ["kind", "identity", "src", "dst", "method", "mab"]),
+    "wsus": ("wsus_endpoints",
+             ["src_ip", "dst_ip", "host", "uri", "user_agent", "indicator"]),
     "smb": ("smb_activity",
             ["src_ip", "dst_ip", "share", "file", "operation", "printer"]),
     "relays": ("relay_scenarios",

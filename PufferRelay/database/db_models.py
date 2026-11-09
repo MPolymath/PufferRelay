@@ -180,6 +180,34 @@ def create_database(db_path=None):
             )
         """)
 
+        # Create NAC / 802.1X observations (issue #30)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS nac_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                identity TEXT,
+                src TEXT,
+                dst TEXT,
+                method TEXT,
+                mab INTEGER DEFAULT 0,
+                UNIQUE(kind, identity, src, dst, method, mab)
+            )
+        """)
+
+        # Create WSUS endpoint observations (issue #14)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wsus_endpoints (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                src_ip TEXT,
+                dst_ip TEXT,
+                host TEXT,
+                uri TEXT,
+                user_agent TEXT,
+                indicator TEXT,
+                UNIQUE(src_ip, dst_ip, host, uri, user_agent, indicator)
+            )
+        """)
+
         # Create SMB share/file activity (issue #44)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS smb_activity (

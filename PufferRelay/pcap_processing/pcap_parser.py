@@ -35,6 +35,8 @@ from PufferRelay.protocols import (
     process_relays,
     process_smb,
     process_files,
+    process_nac,
+    process_wsus,
 )
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
@@ -57,13 +59,15 @@ HANDLERS = {
     "relays": process_relays,
     "smb": process_smb,
     "files": process_files,
+    "nac": process_nac,
+    "wsus": process_wsus,
     "services": process_services,
     "ips": process_ips,
 }
 
 # Handlers that can yield usernames or credentials (#48).
 CREDENTIAL_HANDLERS = {"ldap", "http", "ftp", "telnet", "smtp", "imap", "pop3", "ntlm",
-                       "kerberos", "relays", "smb", "files"}
+                       "kerberos", "relays", "smb", "files", "nac"}
 
 
 def selected_handlers(only=None, credentials_only=False):

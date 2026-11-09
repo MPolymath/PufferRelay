@@ -190,6 +190,17 @@ def collect_users(conn: sqlite3.Connection) -> List[Dict]:
     ):
         add(user, "ntlm", dst)
 
+    # Kerberos principals seen in AS-REQ/AS-REP.
+    if _has_table(conn, "kerberos_asrep"):
+        for user, realm in _rows(conn, "SELECT username, realm FROM kerberos_asrep"):
+            add(user, "kerberos", realm)
+
+    # EAP/RADIUS identities (skip MAC-shaped MAB usernames).
+    if _has_table(conn, "nac_events"):
+        for kind, identity in _rows(conn, "SELECT kind, identity FROM nac_events"):
+            if identity and not looks_like_mac(identity):
+                add(identity, kind or "eap", "")
+
     out = []
     for (domain_key, user), sources in seen.items():
         out.append(
@@ -460,6 +471,50 @@ def collect_files(conn: sqlite3.Connection) -> List[Dict]:
     return out
 
 
+def collect_nac(conn: sqlite3.Connection) -> List[Dict]:
+    """EAP/RADIUS observations (issue #30)."""
+    if not _has_table(conn, "nac_events"):
+        return []
+    out = []
+    for kind, identity, src, dst, method, mab in _rows(
+        conn,
+        "SELECT kind, identity, src, dst, method, mab FROM nac_events",
+    ):
+        out.append(
+            {
+                "kind": kind or "",
+                "identity": identity or "",
+                "src": src or "",
+                "dst": dst or "",
+                "method": method or "",
+                "mab": bool(mab),
+            }
+        )
+    return out
+
+
+def collect_wsus(conn: sqlite3.Connection) -> List[Dict]:
+    """WSUS/Windows Update endpoints (issue #14)."""
+    if not _has_table(conn, "wsus_endpoints"):
+        return []
+    out = []
+    for src, dst, host, uri, user_agent, indicator in _rows(
+        conn,
+        "SELECT src_ip, dst_ip, host, uri, user_agent, indicator FROM wsus_endpoints",
+    ):
+        out.append(
+            {
+                "source_ip": src or "",
+                "destination_ip": dst or "",
+                "host": host or "",
+                "uri": uri or "",
+                "user_agent": user_agent or "",
+                "indicator": indicator or "",
+            }
+        )
+    return out
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
     return {
         "hosts": collect_hosts(conn),
@@ -470,6 +525,8 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "relays": collect_relays(conn),
         "smb": collect_smb(conn),
         "files": collect_files(conn),
+        "nac": collect_nac(conn),
+        "wsus": collect_wsus(conn),
     }
 
 
@@ -507,6 +564,7 @@ Rules
    capture proves and what needs verification.
 """
 
+from PufferRelay.protocols.nac_handler import looks_like_mac
 from PufferRelay.severity import CLEARTEXT_PROTOCOLS, QUICK_WIN_SEVERITY
 
 INTERESTING_SERVICES = {
@@ -824,6 +882,71 @@ def build_leads(inventory: Dict) -> List[Dict]:
                         f"sha256sum files/{item['stored_as']}",
                         "active": False,
                         "warning": "Local file only; it contains client data.",
+                    }
+                ],
+            }
+        )
+
+    # 3a-quater. NAC / 802.1X and WSUS observations.
+    nac = inventory.get("nac", [])
+    if nac:
+        identities = sorted({row["identity"] for row in nac if row["identity"]})
+        mab_identities = sorted({row["identity"] for row in nac if row["mab"]})
+        add(
+            {
+                "id": "NAC-001",
+                "severity": "medium",
+                "title": "802.1X / NAC observed on the captured network",
+                "why": "Port-based access control is in use. Identities and MAC "
+                "authentication-bypass usernames seen in the capture can guide "
+                "credential attacks or authorised port testing.",
+                "evidence": {
+                    "events": len(nac),
+                    "kinds": sorted({row["kind"] for row in nac if row["kind"]}),
+                    "identities": identities[:10],
+                    "mab_count": len(mab_identities),
+                    "sample_macs": mab_identities[:5],
+                },
+                "suggested_actions": [
+                    {
+                        "intent": "Review the identities for password spraying (scope-gated)",
+                        "command": "nxc smb <dc> -u users.txt -p '<password>' "
+                        "--continue-on-success",
+                        "active": True,
+                        "warning": "Active and can lock accounts. Confirm scope and "
+                        "lockout policy.",
+                    }
+                ],
+            }
+        )
+
+    wsus = inventory.get("wsus", [])
+    seen_wsus = set()
+    for i, row in enumerate(
+        [w for w in wsus if (w["destination_ip"], w["host"]) not in seen_wsus],
+        start=1,
+    ):
+        seen_wsus.add((row["destination_ip"], row["host"]))
+        add(
+            {
+                "id": f"WSUS-{i:03d}",
+                "severity": "medium",
+                "title": f"WSUS/Windows Update endpoint: {row['host'] or row['destination_ip']}",
+                "why": "Update infrastructure is visible in the capture. Compromised "
+                "or spoofed WSUS can deliver malicious updates; it also reveals "
+                "patch-management design for the report.",
+                "evidence": {
+                    "destination_ip": row["destination_ip"],
+                    "host": row["host"],
+                    "indicator": row["indicator"],
+                    "sample_uri": row["uri"],
+                },
+                "suggested_actions": [
+                    {
+                        "intent": "Fingerprint the update service (scope-gated)",
+                        "command": f"curl -sk https://{row['host'] or row['destination_ip']}/",
+                        "active": True,
+                        "warning": "Active: contacts the update server. Confirm scope.",
                     }
                 ],
             }
@@ -1183,6 +1306,29 @@ def write_exports(
         }
     )
     _write_text(path("smb-files.txt"), file_lines)
+
+    nac = inventory.get("nac", [])
+    _write_text(
+        path("nac.txt"),
+        sorted(
+            {
+                f"{row['kind']}	{row['identity'] or '-'}	{row['src']}	{row['dst']}	"
+                f"{row['method']}	{'mab' if row['mab'] else 'dot1x'}"
+                for row in nac
+            }
+        ),
+    )
+    wsus = inventory.get("wsus", [])
+    _write_text(
+        path("wsus.txt"),
+        sorted(
+            {
+                f"{row['destination_ip']}	{row['host'] or '-'}	{row['indicator']}	"
+                f"{row['uri']}"
+                for row in wsus
+            }
+        ),
+    )
 
     # Carved file objects (issue #57). These are client data: they stay in the
     # local export directory and are never uploaded by the tool.

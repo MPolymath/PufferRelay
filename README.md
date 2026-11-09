@@ -69,7 +69,7 @@ pufferrelay -r --inventory <br>
 pufferrelay -r --protocol ftp,ntlm <br>
 
 ### Documentation
-The <a href="https://mpolymath.gitbook.io/pufferrelay">Wiki</a> is under construction but will be available soon !
+Documentation lives in <a href="wiki/README.md">wiki/</a> (source for the GitBook: install, features, protocols, outputs, performance, privacy, FAQ).
 
 ---
 
