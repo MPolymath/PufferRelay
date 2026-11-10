@@ -18,7 +18,7 @@
 # Credits: Portions of this code were adapted from PCredz (https://github.com/lgandx/PCredz)
 #         (c) Laurent Gaffie GNU General Public License v3.0.
 
-__version__ = "1.1.2"
+__version__ = "1.2.0"
 __author__ = "PufferRelay"
 __license__ = "GPL"
 
@@ -28,4 +28,4 @@ from .protocols import *
 from .database import *
 from .utils import *
 
-__version__ = "1.1.2"
+__version__ = "1.2.0"

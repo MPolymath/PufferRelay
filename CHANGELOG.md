@@ -1,3 +1,31 @@
+# PufferRelay 1.2.0 — 2026-11-10
+
+Passive Wi-Fi (802.11) coverage (epic #82, issues #72–#81). PufferRelay still
+never sets monitor mode, injects frames or cracks a key; active Wi-Fi commands
+are text only and marked ACTIVE.
+
+- `wifi`: BSSID/SSID/band/channel, AKMs, ciphers, PMF, clients and a
+  conservative security label (OPEN/WEP/WPA2-PSK/WPA2-ENTERPRISE/WPA2-MIXED/
+  WPA3-SAE/WPA3-TRANSITION/OWE).
+- `wifiwep`: IV/unique-IV/weak-IV/ARP counts and offline-crack readiness.
+- `wifihs`: EAPOL 1–4 pairing per BSSID/client, complete-handshake flag and
+  PMKID capture; `pmkid-hashes.txt` in hashcat 22000 form when complete.
+- `wifiwps`: WPS state/lock/selected registrar/methods/vendor and risk.
+- `wifieap`: EAP identities and methods (PEAP/TTLS/TLS/GTC/MSCHAPv2).
+- `wifiwpa3`: SAE-only vs PSK+SAE transition mode, PMF capable/required and
+  SAE auth frames; transition without required PMF is downgrade-exposed.
+- `wifievents`: deauth/disassoc bursts and duplicate-SSID/security/OUI
+  candidates.
+- New tables (`wifi_networks`, `wifi_wep`, `wifi_handshakes`, `wifi_wps`,
+  `wifi_eap`, `wifi_wpa3`, `wifi_events`), export TSVs, `WIFI-*` leads with
+  `proof_level`, ATT&CK mapping (T1040/T1557/T1110) and `-r --protocol wifi...`.
+- `--wifi-commands [FILE]` writes `wifi-attacks.md`: per-finding commands with
+  prerequisites, warnings and cleanup, or article links when no local tool
+  exists (WPA3/Dragonblood/SSID Confusion/KRACK/FragAttacks).
+- `--auto` selects the Wi-Fi handlers for 802.11 captures and skips them on
+  Ethernet; one union tshark pass feeds all handlers.
+- Tests: 31 new Wi-Fi tests; full suite 181 passing offline.
+
 # PufferRelay 1.1.2 — 2026-11-09
 
 Packaging fix:

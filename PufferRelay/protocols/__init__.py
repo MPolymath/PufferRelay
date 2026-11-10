@@ -56,6 +56,15 @@ from .rdp import process_rdp
 from .cloudapi import process_cloudapi
 from .fingerprints import process_fingerprints
 from .ldapadcs import process_ldap_adcs
+from .wifi import (
+    process_wifi,
+    process_wifi_wep,
+    process_wifi_hs,
+    process_wifi_wps,
+    process_wifi_eap,
+    process_wifi_wpa3,
+    process_wifi_events,
+)
 
 __all__ = [
     'process_ldap',
@@ -93,5 +102,12 @@ __all__ = [
     'process_rdp',
     'process_cloudapi',
     'process_fingerprints',
-    'process_ldap_adcs'
+    'process_ldap_adcs',
+    'process_wifi',
+    'process_wifi_wep',
+    'process_wifi_hs',
+    'process_wifi_wps',
+    'process_wifi_eap',
+    'process_wifi_wpa3',
+    'process_wifi_events'
 ]

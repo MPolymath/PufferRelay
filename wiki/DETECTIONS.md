@@ -5,7 +5,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 
 > Detection is not exploitation. A passive finding says what crossed the wire; verify before acting, and respect the scope.
 
-41 entries: 37 passive, 4 active.
+48 entries: 44 passive, 4 active.
 
 ## Inventory (3)
 
@@ -308,7 +308,7 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Capture fields:** ldap.AttributeDescription, ldap.AttributeValue  
 **Reference:** https://www.thehacker.recipes/ad/movement/adcs/certificate-templates
 
-## Network (6)
+## Network (9)
 
 | When | Handler | Detects | Severity | Status |
 |---|---|---|---|---|
@@ -318,6 +318,9 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 | DHCPv6, ICMPv6 router advertisements or DNS UPDATE are present | `ipv6` | offered DNS servers, RDNSS/DNSSL, and ADIDNS dynamic updates; one host doing both is critical | critical | implemented |
 | SIP or Cisco Skinny/SCCP signalling is present | `voip` | SIP methods (REGISTER/INVITE/MESSAGE), caller/callee, Call-ID, digest auth presence and digest fields; Skinny call party metadata | medium | implemented |
 | SSH, TLS, VNC or TFTP traffic is present | `fingerprints` | SSH banners, TLS SNI and version, VNC protocol/security type, TFTP file names, SMB3 encryption capability/session | medium | implemented |
+| the capture is 802.11/radiotap (monitor mode) | `wifi` | BSSID, SSID, band/channel, security suite, AKMs, ciphers, PMF, clients | low | implemented |
+| EAP identity or EAP method frames are present | `wifieap` | identities and EAP methods (PEAP, TTLS, TLS, GTC, MSCHAPv2) | medium | implemented |
+| deauth/disassoc frames or duplicate SSIDs are present | `wifievents` | deauth/disassoc bursts and duplicate-SSID/security/OUI mismatches | medium | implemented |
 
 ### `nac` — det.nac
 
@@ -375,6 +378,36 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Next:** prioritise no-auth VNC, cleartext TFTP and old SSH banners for verification  
 **Capture fields:** ssh.protocol, tls.handshake.extensions_server_name, vnc.server_proto_ver, vnc.server_security_type, tftp.source_file, smb2.ses_flags.encrypt  
 
+### `wifi` — det.wifi
+
+**Mode:** passive  
+**Proves:** the security configuration advertised by beacons/probe responses  
+**Limits:** a beacon is a capability claim, not proof of enforcement; hidden SSIDs are partial  
+**Output:** wifi-networks.tsv; leads WIFI-NET-*  
+**Next:** use the security label to pick the WEP/WPS/EAP/WPA3 handler  
+**Capture fields:** wlan.bssid, wlan.ssid, wlan.rsn.akms.type, wlan.rsn.capabilities.mfpc/mfpr  
+**Reference:** https://www.thehacker.recipes/radio/wi-fi/wpa2/
+
+### `wifieap` — det.wifieap
+
+**Mode:** passive  
+**Proves:** the identities/methods exposed before the TLS tunnel  
+**Limits:** no passwords; certificate validation cannot be proven passively  
+**Output:** wifi-eap.tsv; leads WIFI-EAP-*  
+**Next:** rogue AP/relay (eaphammer, hostapd-mana) is active and scope-gated  
+**Capture fields:** eap.identity, eap.type, eap.code  
+**Reference:** https://www.synacktiv.com/publications/wireless-infidelity-pentest-wi-fi-en-2025.html
+
+### `wifievents` — det.wifievents
+
+**Mode:** passive  
+**Proves:** activity worth investigating; a duplicate SSID is a candidate only  
+**Limits:** cannot prove an evil twin; benign duplicate APs exist  
+**Output:** wifi-events.tsv; leads WIFI-EVILTWIN-*/WIFI-DEAUTH-*  
+**Next:** confirm with bettercap/mdk4 only after checking scope  
+**Capture fields:** wlan.fc.type_subtype, wlan.bssid, wlan.ssid, wlan.rsn.akms.type  
+**Reference:** https://www.synacktiv.com/publications/wireless-infidelity-pentest-wi-fi-en-2025.html
+
 ## Files (2)
 
 | When | Handler | Detects | Severity | Status |
@@ -402,11 +435,15 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Capture fields:** tshark --export-objects smb  
 **Reference:** https://www.thehacker.recipes/ad/movement/smb/
 
-## Weakness (1)
+## Weakness (5)
 
 | When | Handler | Detects | Severity | Status |
 |---|---|---|---|---|
 | -q is used, or -f is combined with -q | `quickwins` | SMBv1, missing SMB/LDAP signing, SNMPv1/v2, SSLv2/v3, TLS1.0, LLMNR/NBT-NS/mDNS, cleartext protocols | varies | implemented |
+| WEP-protected data frames are present | `wifiwep` | IV count, unique IVs, weak IVs, ARP frames, clients, crack readiness | critical | implemented |
+| EAPOL 4-way handshake frames or a PMKID are present | `wifihs` | M1-M4 pairing per BSSID/client, complete handshakes, PMKID values | high | implemented |
+| a beacon/probe response carries a WPS information element | `wifiwps` | WPS state, lock, selected registrar, config methods, vendor/model | high | implemented |
+| RSN advertises SAE or a PSK+SAE transition mode | `wifiwpa3` | SAE-only vs transition mode, PMF capable/required, SAE auth frames | medium | implemented |
 
 ### `quickwins` — det.quickwins
 
@@ -417,6 +454,46 @@ The catalog of everything PufferRelay extracts, what it proves, what it cannot p
 **Next:** confirm the weak setting from the operator host (ACTIVE, scope-gated)  
 **Capture fields:** one tshark pass over the quick-win fields  
 **Reference:** https://www.thehacker.recipes/ad/movement/mitm-and-coerced-authentications/llmnr-nbtns-mdns-spoofing
+
+### `wifiwep` — det.wifiwep
+
+**Mode:** passive  
+**Proves:** material for an offline WEP crack when enough unique IVs are captured  
+**Limits:** readiness is a threshold estimate; only a crack proves the key  
+**Output:** wifi-wep.tsv; leads WIFI-WEP-*  
+**Next:** aircrack-ng offline; inject ARP replay only if more IVs are required  
+**Capture fields:** wlan.wep.iv, wlan.wep.weakiv, wlan.fc.protected, arp.opcode  
+**Reference:** https://www.thehacker.recipes/radio/wi-fi/wep/
+
+### `wifihs` — det.wifihs
+
+**Mode:** passive  
+**Proves:** material that can be attacked offline with hashcat mode 22000  
+**Limits:** a handshake is not a password; PMKID may need an association attempt  
+**Output:** wifi-handshakes.tsv; pmkid-hashes.txt; leads WIFI-HANDSHAKE-*/WIFI-PMKID-*  
+**Next:** hcxpcapngtool + hashcat -m 22000 offline; deauth only if incomplete  
+**Capture fields:** eapol.keydes.*, wlan.rsn.ie.pmkid, wlan.rsn.pmkid.list  
+**Reference:** https://www.thehacker.recipes/radio/wi-fi/wpa2/
+
+### `wifiwps` — det.wifiwps
+
+**Mode:** passive  
+**Proves:** WPS is advertised and whether it reports itself locked  
+**Limits:** Pixie Dust applicability depends on the chipset; the PIN attack is active  
+**Output:** wifi-wps.tsv; leads WIFI-WPS-*  
+**Next:** wash/reaver/bully only with monitor mode and a lockout plan  
+**Capture fields:** wps.wifi_protected_setup_state, wps.ap_setup_locked, wps.config_methods  
+**Reference:** https://www.thehacker.recipes/radio/wi-fi/wps/
+
+### `wifiwpa3` — det.wifiwpa3
+
+**Mode:** passive  
+**Proves:** transition mode without required PMF is downgrade-exposed  
+**Limits:** SAE has no offline hash; Dragonblood/SSID Confusion need active verification  
+**Output:** wifi-wpa3.tsv; leads WIFI-WPA3-*  
+**Next:** DragonShift for transition mode; references for SAE side channels  
+**Capture fields:** wlan.rsn.akms.type, wlan.rsn.capabilities.mfpc/mfpr, wlan.fixed.sae_message_type  
+**Reference:** https://github.com/jabbaw0nky/DragonShift
 
 ## Cloud (1)
 

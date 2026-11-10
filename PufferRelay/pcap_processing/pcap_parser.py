@@ -55,6 +55,13 @@ from PufferRelay.protocols import (
     process_cloudapi,
     process_fingerprints,
     process_ldap_adcs,
+    process_wifi,
+    process_wifi_wep,
+    process_wifi_hs,
+    process_wifi_wps,
+    process_wifi_eap,
+    process_wifi_wpa3,
+    process_wifi_events,
 )
 from PufferRelay.core_imports import logging
 from PufferRelay.utils.loading_animation import show_loading_animation
@@ -99,6 +106,13 @@ HANDLERS = {
     "cloudapi": process_cloudapi,
     "fingerprints": process_fingerprints,
     "ldapadcs": process_ldap_adcs,
+    "wifi": process_wifi,
+    "wifiwep": process_wifi_wep,
+    "wifihs": process_wifi_hs,
+    "wifiwps": process_wifi_wps,
+    "wifieap": process_wifi_eap,
+    "wifiwpa3": process_wifi_wpa3,
+    "wifievents": process_wifi_events,
     "services": process_services,
     "ips": process_ips,
 }
@@ -145,6 +159,13 @@ def parse_pcap(pcap_file, only=None, credentials_only=False, animate=None, jobs=
     """
     logging.info("Parsing PCAP file: %s", pcap_file)
     names = selected_handlers(only=only, credentials_only=credentials_only)
+    if only is None:
+        # Wi-Fi handlers only make sense on 802.11/radiotap captures. The
+        # check reads one packet, so an Ethernet full run is not penalised.
+        from PufferRelay.protocols import wifi as wifi_module
+
+        if not wifi_module.is_wifi_capture(pcap_file):
+            names = [name for name in names if name not in wifi_module.WIFI_HANDLERS]
     logging.info("Handlers: %s", ", ".join(names))
     try:
         size_mb = os.path.getsize(pcap_file) / (1024 * 1024)

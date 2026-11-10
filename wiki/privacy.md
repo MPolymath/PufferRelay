@@ -29,3 +29,8 @@ Client captures are confidential. Full rules: [`docs/PRIVACY.md`](../docs/PRIVAC
 - Live capture and the relay require `--live`/`--proxy`, a red warning and
   authorization; live captures are deleted after analysis unless
   `--keep-live-capture` is set.
+- Wi-Fi captures can contain third-party traffic (neighbouring networks,
+  clients, probe requests) and personal data. Handshakes, PMKIDs and
+  `pmkid-hashes.txt` are live secrets; they stay in the engagement directory,
+  are never uploaded and are deleted at cleanup. `--wifi-commands` writes text
+  only and never injects a frame.

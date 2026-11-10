@@ -53,6 +53,7 @@ ATTCK_BY_PREFIX = {
     "FILE": ["T1039"],
     "NAC": ["T1557"],
     "WSUS": ["T1072"],
+    "WIFI": ["T1040", "T1557", "T1110"],
     "ASREPCATCHER": ["T1557", "T1558.004"],
     "QW": ["T1040"],
     "REUSE": ["T1078"],
@@ -1181,6 +1182,18 @@ def collect_voip(conn: sqlite3.Connection) -> List[Dict]:
     return out
 
 
+def collect_wifi(conn: sqlite3.Connection) -> Dict:
+    """Passive 802.11 findings (epic #82).
+
+    Returns the seven Wi-Fi tables keyed by short name: networks, wep,
+    handshakes, wps, eap, wpa3 and events. Each row is a dict; proof levels
+    are carried verbatim from the handlers.
+    """
+    from PufferRelay.protocols import wifi as wifi_module
+
+    return wifi_module.collect_wifi(conn)
+
+
 def collect_inventory(conn: sqlite3.Connection) -> Dict:
     inventory = {
         "hosts": collect_hosts(conn),
@@ -1211,6 +1224,7 @@ def collect_inventory(conn: sqlite3.Connection) -> Dict:
         "rdp": collect_service_events(conn, "rdp"),
         "cloudapi": collect_service_events(conn, "cloudapi"),
         "fingerprints": collect_service_events(conn, "fingerprints"),
+        "wifi": collect_wifi(conn),
     }
     inventory["chains"] = build_chains(inventory)
     inventory["graph"] = build_graph(inventory)
@@ -2264,6 +2278,230 @@ def build_leads(inventory: Dict) -> List[Dict]:
                 }
             )
 
+    # 6. Passive Wi-Fi findings (epic #82). Every lead states its proof level:
+    # observed / offline-crackable / active-verification-required.
+    wifi = inventory.get("wifi") or {}
+    for row in wifi.get("networks") or []:
+        add(
+            {
+                "id": f"WIFI-NET-{row['bssid']}",
+                "severity": "low",
+                "title": f"Wi-Fi network {row.get('ssid') or '<hidden>'} "
+                f"({row.get('bssid')})",
+                "why": f"Security: {row.get('security')}; PMF "
+                f"{row.get('pmf')}; {row.get('clients')} client(s). "
+                "Inventory only: a beacon is a capability claim.",
+                "evidence": row,
+                "proof_level": "observed",
+            }
+        )
+
+    for row in wifi.get("wep") or []:
+        bssid = row.get("bssid")
+        add(
+            {
+                "id": f"WIFI-WEP-{bssid}",
+                "severity": "critical",
+                "title": f"WEP network {row.get('ssid') or bssid} ({bssid})",
+                "why": "WEP is broken by design. "
+                f"{row.get('unique_ivs')} unique IV(s) captured: "
+                f"{row.get('readiness')}.",
+                "evidence": row,
+                "proof_level": row.get("proof") or "observed",
+                "suggested_actions": [
+                    {
+                        "intent": "Crack the captured IVs offline",
+                        "command": f"aircrack-ng -b {bssid} capture.pcap",
+                        "active": False,
+                        "warning": "Offline: operates on the local capture only.",
+                    },
+                    {
+                        "intent": "Collect more IVs if the threshold is not met",
+                        "command": f"aireplay-ng --arpreplay -b {bssid} wlan0mon",
+                        "active": True,
+                        "warning": "Active: injects frames and can disrupt the AP. "
+                        "Confirm scope and expect client impact.",
+                    },
+                ],
+            }
+        )
+
+    for row in wifi.get("handshakes") or []:
+        bssid = row.get("bssid")
+        if row.get("complete"):
+            add(
+                {
+                    "id": f"WIFI-HANDSHAKE-{bssid}",
+                    "severity": "high",
+                    "title": f"WPA/WPA2 handshake captured for "
+                    f"{row.get('ssid') or bssid}",
+                    "why": "A complete 4-way handshake can be attacked offline "
+                    "with a wordlist. It is not a password.",
+                    "evidence": row,
+                    "proof_level": "offline-crackable",
+                    "suggested_actions": [
+                        {
+                            "intent": "Convert and crack the handshake offline",
+                            "command": "hcxpcapngtool -o handshake.hc22000 "
+                            "handshake.pcap && hashcat -m 22000 "
+                            "handshake.hc22000 wordlist.txt",
+                            "active": False,
+                            "warning": "Offline: keep the capture and hash local.",
+                        }
+                    ],
+                }
+            )
+        if len(row.get("pmkid") or "") == 32:
+            add(
+                {
+                    "id": f"WIFI-PMKID-{bssid}",
+                    "severity": "high",
+                    "title": f"PMKID captured for {row.get('ssid') or bssid}",
+                    "why": "A PMKID can be attacked offline with hashcat mode 22000.",
+                    "evidence": row,
+                    "proof_level": "offline-crackable",
+                    "suggested_actions": [
+                        {
+                            "intent": "Crack the PMKID offline",
+                            "command": "hashcat -m 22000 pmkid.hc22000 wordlist.txt",
+                            "active": False,
+                            "warning": "Offline: the PMKID line stays in the "
+                            "engagement directory.",
+                        }
+                    ],
+                }
+            )
+
+    for row in wifi.get("wps") or []:
+        bssid = row.get("bssid")
+        add(
+            {
+                "id": f"WIFI-WPS-{bssid}",
+                "severity": row.get("risk") or "medium",
+                "title": f"WPS enabled on {row.get('ssid') or bssid} ({bssid})",
+                "why": f"WPS state {row.get('state') or 'unknown'}, locked "
+                f"{row.get('locked')}, methods {row.get('config_methods') or '-'}. "
+                "PIN/Pixie Dust require active frames.",
+                "evidence": row,
+                "proof_level": "observed",
+                "suggested_actions": [
+                    {
+                        "intent": "Test WPS (PIN / Pixie Dust) from monitor mode",
+                        "command": f"reaver -i wlan0mon -b {bssid} -c <CH> -vv",
+                        "active": True,
+                        "warning": "Active: may lock WPS or disrupt the AP. "
+                        "Check lockout behaviour before starting.",
+                    }
+                ],
+            }
+        )
+
+    for row in wifi.get("eap") or []:
+        bssid = row.get("bssid")
+        add(
+            {
+                "id": f"WIFI-EAP-{bssid}-{row.get('identity')}",
+                "severity": "medium",
+                "title": f"Enterprise identity {row.get('identity')} on {bssid}",
+                "why": f"EAP methods: {row.get('methods') or '-'}. A rogue AP "
+                "or relay needs an active step and may fail certificate validation.",
+                "evidence": row,
+                "proof_level": "observed",
+                "suggested_actions": [
+                    {
+                        "intent": "Rogue authenticator / PEAP relay",
+                        "command": "eaphammer -i wlan0mon --auth wpa-eap "
+                        "--identity <identity> --cert-wizard",
+                        "active": True,
+                        "warning": "Active: clients may connect to the rogue AP. "
+                        "Confirm scope and stop it immediately after the test.",
+                    }
+                ],
+            }
+        )
+
+    for row in wifi.get("wpa3") or []:
+        bssid = row.get("bssid")
+        if row.get("downgrade_risk"):
+            add(
+                {
+                    "id": f"WIFI-WPA3-DOWNGRADE-{bssid}",
+                    "severity": "high",
+                    "title": f"WPA3 transition mode with PMF not required on "
+                    f"{row.get('ssid') or bssid}",
+                    "why": "A WPA2-only rogue AP can downgrade a transition-mode "
+                    "client and capture a crackable handshake.",
+                    "evidence": row,
+                    "proof_level": "active-verification-required",
+                    "suggested_actions": [
+                        {
+                            "intent": "Downgrade to WPA2 and capture the handshake",
+                            "command": "python3 dragonshift.py -m wlan0mon "
+                            "-r <second-iface>",
+                            "active": True,
+                            "warning": "Active: rogue AP plus deauth. Disruptive; "
+                            "scope and written authorisation required.",
+                        },
+                        {
+                            "intent": "Read the technique",
+                            "command": "https://github.com/jabbaw0nky/DragonShift",
+                            "active": False,
+                            "warning": "Reference only.",
+                        },
+                    ],
+                }
+            )
+        else:
+            add(
+                {
+                    "id": f"WIFI-WPA3-SAE-{bssid}",
+                    "severity": "low",
+                    "title": f"WPA3-SAE network {row.get('ssid') or bssid}",
+                    "why": "SAE has no offline handshake or PMKID hash. "
+                    "Dragonblood side channels and SSID Confusion need active "
+                    "verification.",
+                    "evidence": row,
+                    "proof_level": "observed",
+                    "suggested_actions": [
+                        {
+                            "intent": "Read the applicable research",
+                            "command": "https://wpa3.mathyvanhoef.com/ ; "
+                            "https://www.usenix.org/conference/usenixsecurity24/"
+                            "presentation/vanhoef",
+                            "active": False,
+                            "warning": "Reference only; no local tool path from "
+                            "the capture.",
+                        }
+                    ],
+                }
+            )
+
+    for row in wifi.get("events") or []:
+        bssid = row.get("bssid")
+        kind = row.get("kind") or "wifi-event"
+        if kind == "evil-twin-candidate":
+            lead_id = f"WIFI-EVILTWIN-{bssid}"
+            why = (
+                "Duplicate SSID with a different BSSID/security/OUI. Passive "
+                "evidence only: this is a candidate, not a proven evil twin."
+            )
+            proof = "active-verification-required"
+        else:
+            lead_id = f"WIFI-DEAUTH-{bssid}-{row.get('client') or '-'}"
+            why = "Deauth/disassoc frames were observed; bursts can indicate "
+            "an attack or a noisy client."
+            proof = "observed"
+        add(
+            {
+                "id": lead_id,
+                "severity": row.get("severity") or "medium",
+                "title": f"{kind} on {row.get('ssid') or bssid}",
+                "why": why,
+                "evidence": row,
+                "proof_level": proof,
+            }
+        )
+
     severity_rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     leads.sort(key=lambda x: (severity_rank.get(x.get("severity", "low"), 9), x["id"]))
     return leads
@@ -2349,6 +2587,8 @@ def leads_to_markdown(inventory: Dict, leads: Sequence[Dict], pcap_name: str = "
         lines.append(f"## [{lead['severity'].upper()}] {lead['id']} - {lead['title']}")
         lines.append("")
         lines.append(f"**Why it matters:** {lead.get('why', '')}")
+        if lead.get("proof_level"):
+            lines.append(f"**Proof level:** `{lead['proof_level']}`")
         evidence = lead.get("evidence") or {}
         if evidence:
             lines.append("")
@@ -2794,6 +3034,96 @@ def write_exports(
             written.append(created)
     except Exception as bloodhound_error:  # never fail the whole export for this
         print(f"bloodhound export skipped: {bloodhound_error}")
+
+    # Passive Wi-Fi findings (epic #82). Only written for 802.11 captures.
+    wifi = inventory.get("wifi") or {}
+    if any(wifi.values()):
+        from PufferRelay.protocols import wifi as wifi_module
+
+        _write_text(
+            path("wifi-networks.tsv"),
+            ["bssid	ssid	band	channel	security	akms	ciphers	pmf	beacons	clients"]
+            + [
+                f"{r['bssid']}	{r['ssid'] or '-'}	{r['band'] or '-'}	"
+                f"{r['channel'] or '-'}	{r['security'] or '-'}	"
+                f"{r['akms'] or '-'}	{r['ciphers'] or '-'}	{r['pmf'] or '-'}	"
+                f"{r['beacons']}	{r['clients']}"
+                for r in wifi.get("networks") or []
+            ],
+        )
+        _write_text(
+            path("wifi-wep.tsv"),
+            ["bssid	ssid	channel	ivs	unique_ivs	weak_ivs	arp	readiness	proof"]
+            + [
+                f"{r['bssid']}	{r['ssid'] or '-'}	{r['channel'] or '-'}	"
+                f"{r['iv_count']}	{r['unique_ivs']}	{r['weak_ivs']}	"
+                f"{r['arp_frames']}	{r['readiness']}	{r['proof']}"
+                for r in wifi.get("wep") or []
+            ],
+        )
+        _write_text(
+            path("wifi-handshakes.tsv"),
+            ["bssid	ssid	client	messages	complete	pmkid	proof"]
+            + [
+                f"{r['bssid']}	{r['ssid'] or '-'}	{r['client']}	"
+                f"{r['messages'] or '-'}	{r['complete']}	{r['pmkid'] or '-'}	"
+                f"{r['proof']}"
+                for r in wifi.get("handshakes") or []
+            ],
+        )
+        _write_text(
+            path("pmkid-hashes.txt"),
+            sorted(
+                {
+                    wifi_module.build_pmkid_line(
+                        r.get("pmkid"), r.get("bssid"), r.get("client"),
+                        r.get("ssid"),
+                    )
+                    for r in wifi.get("handshakes") or []
+                }
+                - {""}
+            ),
+        )
+        _write_text(
+            path("wifi-wps.tsv"),
+            ["bssid	ssid	state	locked	selected_registrar	methods	vendor	model	risk"]
+            + [
+                f"{r['bssid']}	{r['ssid'] or '-'}	{r['state'] or '-'}	"
+                f"{r['locked']}	{r['selected_registrar']}	"
+                f"{r['config_methods'] or '-'}	{r['manufacturer'] or '-'}	"
+                f"{r['model'] or '-'}	{r['risk']}"
+                for r in wifi.get("wps") or []
+            ],
+        )
+        _write_text(
+            path("wifi-eap.tsv"),
+            ["bssid	identity	methods	frames	proof"]
+            + [
+                f"{r['bssid']}	{r['identity'] or '-'}	{r['methods'] or '-'}	"
+                f"{r['frames']}	{r['proof']}"
+                for r in wifi.get("eap") or []
+            ],
+        )
+        _write_text(
+            path("wifi-wpa3.tsv"),
+            ["bssid	ssid	akms	pmf	sae_frames	transition	downgrade_risk	proof"]
+            + [
+                f"{r['bssid']}	{r['ssid'] or '-'}	{r['akms'] or '-'}	"
+                f"{r['pmf'] or '-'}	{r['sae_frames']}	{r['transition']}	"
+                f"{r['downgrade_risk']}	{r['proof']}"
+                for r in wifi.get("wpa3") or []
+            ],
+        )
+        _write_text(
+            path("wifi-events.tsv"),
+            ["kind	severity	bssid	ssid	client	count	detail"]
+            + [
+                f"{r['kind']}	{r['severity']}	{r['bssid'] or '-'}	"
+                f"{r['ssid'] or '-'}	{r['client'] or '-'}	{r['count']}	"
+                f"{r['detail']}"
+                for r in wifi.get("events") or []
+            ],
+        )
 
     _write_json(path("summary.json"), {"inventory": inventory, "leads": leads})
     _write_json(

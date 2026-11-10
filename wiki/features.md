@@ -28,6 +28,7 @@ misses, output, next step) is **[DETECTIONS.md](DETECTIONS.md)**, generated from
 | AD exposure | RPC coercion attempts, ADCS enrollment/PKINIT, SCCM management traffic, relay candidates |
 | AI infrastructure | LLM endpoints/API usage, unauthenticated inference, MCP tool calls, vector DBs |
 | Network takeover | DHCPv6/RA rogue DNS, ADIDNS dynamic updates |
+| Wi-Fi (802.11) | passive network/client inventory, security/PMF classification, WEP IV readiness, WPA2 handshake + PMKID (hashcat 22000), WPS, EAP identities/methods, WPA3-SAE/transition, rogue/deauth candidates, with explicit proof levels |
 | Clear text | HTTP/FTP file objects carved with sha256, HTTP WSUS endpoints |
 | Weakness | quick wins: SMBv1, SMB signing, LDAP signing, SNMPv1/v2, SSLv2/v3, TLS1.0, LLMNR/NBT-NS/mDNS, cleartext protocols |
 
@@ -41,6 +42,9 @@ misses, output, next step) is **[DETECTIONS.md](DETECTIONS.md)**, generated from
 `sccm.tsv`, `llm.tsv`, `kerberos-signals.tsv`, `ldap-spns.tsv`,
 `ldap-signing.tsv`, `ldap-adcs.tsv`, `voip.tsv`, `media.tsv`, `rdp.tsv`,
 `cloud-apis.tsv`, `fingerprints.tsv`, `credential-matrix.tsv`,
+`wifi-networks.tsv`, `wifi-wep.tsv`, `wifi-handshakes.tsv`,
+`pmkid-hashes.txt`, `wifi-wps.tsv`, `wifi-eap.tsv`, `wifi-wpa3.tsv`,
+`wifi-events.tsv`,
 `identity-graph.json`, `files.tsv` + `files/`, `bloodhound/`, `summary.json`.
 
 ## Agent feed
@@ -57,6 +61,7 @@ See [outputs.md](outputs.md).
 | `--proxy --proxy-target HOST:PORT` | local TCP relay, records both directions to JSONL | red warning + confirmation; one target, bounded duration |
 | `--commands` | writes `active-commands.md` (ARP spoof / relay commands) | text only; nothing executed; cleanup commands included |
 | `--serveme` | writes `serveme.md` (next-step command per host/finding) | text only; ACTIVE lines flagged |
+| `--wifi-commands` | writes `wifi-attacks.md` (WEP/WPA2/WPS/EAP/WPA3/rogue commands) | text only; ACTIVE lines marked; article links when no local tool exists |
 
 Passive analysis remains the default; these modes never run implicitly.
 

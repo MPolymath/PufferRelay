@@ -11,6 +11,8 @@ It focuses on parsing and analyzing network traffic to surface sensitive or acti
 
 - Extracts protocol-specific data
     - LDAP, HTTP, FTP, TELNET, SMTP, IMAP, POP3, NETBIOS, NTLM, SNMP
+- Passive 802.11/Wi-Fi analysis: network inventory, WEP, WPA2 handshake/PMKID,
+  WPS, EAP identities, WPA3/PMF and rogue/deauth candidates
 - Parses `.pcap` files and stores data in a queryable SQL format
 - Designed for use in red teaming and network traffic analysis
 - Modular structure for easy extension
@@ -40,6 +42,9 @@ pufferrelay -f {filename}
 
 #### Read 'DB_NAME' database and extract all pertinent information
 pufferrelay -r
+
+#### Analyse a monitor-mode Wi-Fi capture and write the text-only command pack
+pufferrelay -f wifi.pcapng --wifi-commands out/wifi-attacks.md
 
 ### 🐛 DEBUG
 pufferrelay -f {filename} --log-level DEBUG

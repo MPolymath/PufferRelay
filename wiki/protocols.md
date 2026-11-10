@@ -194,3 +194,26 @@ narrow: a capture proves traffic, not intent.
 ## Files
 - HTTP response bodies and FTP-DATA objects, sha256, size, safe name.
 - Limit: objects split across many TCP segments depend on tshark reassembly.
+
+## Wi-Fi (802.11)
+- One union radiotap pass feeds the seven Wi-Fi handlers. Input is a
+  monitor-mode capture; PufferRelay never sets monitor mode or injects frames.
+- `wifi`: BSSID/SSID/band/channel, AKMs, ciphers, PMF and client counts. A
+  beacon is a capability claim, not proof of enforcement.
+- `wifiwep`: per-BSSID IV/unique-IV/weak-IV/ARP counts and crack readiness
+  (~20k unique IVs is the offline threshold; below it is active-only).
+- `wifihs`: EAPOL 1–4 pairing per BSSID/client and PMKIDs, exported as
+  hashcat 22000 lines only when every field is complete.
+- `wifiwps`: WPS state/lock/selected registrar/methods/vendor and a risk label.
+  Pixie Dust applicability depends on the chipset and is active.
+- `wifieap`: EAP identities and methods (PEAP/TTLS/TLS/GTC/MSCHAPv2). No
+  passwords; certificate validation cannot be proven passively.
+- `wifiwpa3`: SAE-only vs PSK+SAE transition mode, PMF state and SAE frames.
+  SAE has no offline hash; transition mode without required PMF is
+  downgrade-exposed but needs DragonShift (active).
+- `wifievents`: deauth/disassoc bursts and duplicate-SSID/security/OUI
+  candidates. A duplicate SSID is a candidate, not a proven evil twin.
+- Limit: 802.11w/PMF hides management frames; PMKID capture may require an
+  association attempt; a handshake is not a password. `--wifi-commands` writes
+  the ACTIVE commands and article links; nothing is executed.
+

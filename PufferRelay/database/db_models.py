@@ -491,6 +491,113 @@ def create_database(db_path=None):
             )
         """)
 
+        # Passive Wi-Fi / 802.11 findings (epic #82).
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wifi_networks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bssid TEXT,
+                ssid TEXT,
+                band TEXT,
+                channel TEXT,
+                security TEXT,
+                akms TEXT,
+                ciphers TEXT,
+                pmf TEXT,
+                first_seen TEXT,
+                last_seen TEXT,
+                beacons INTEGER DEFAULT 0,
+                clients INTEGER DEFAULT 0,
+                UNIQUE(bssid, ssid)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wifi_wep (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bssid TEXT,
+                ssid TEXT,
+                channel TEXT,
+                iv_count INTEGER DEFAULT 0,
+                unique_ivs INTEGER DEFAULT 0,
+                weak_ivs INTEGER DEFAULT 0,
+                arp_frames INTEGER DEFAULT 0,
+                clients INTEGER DEFAULT 0,
+                readiness TEXT,
+                proof TEXT,
+                UNIQUE(bssid)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wifi_handshakes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bssid TEXT,
+                ssid TEXT,
+                client TEXT,
+                messages TEXT,
+                complete INTEGER DEFAULT 0,
+                pmkid TEXT,
+                proof TEXT,
+                UNIQUE(bssid, client)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wifi_wps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bssid TEXT,
+                ssid TEXT,
+                state TEXT,
+                locked INTEGER DEFAULT 0,
+                selected_registrar INTEGER DEFAULT 0,
+                config_methods TEXT,
+                manufacturer TEXT,
+                model TEXT,
+                device_name TEXT,
+                version TEXT,
+                risk TEXT,
+                UNIQUE(bssid)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wifi_eap (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bssid TEXT,
+                identity TEXT,
+                methods TEXT,
+                src TEXT,
+                dst TEXT,
+                frames INTEGER DEFAULT 0,
+                proof TEXT,
+                UNIQUE(bssid, identity)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wifi_wpa3 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bssid TEXT,
+                ssid TEXT,
+                akms TEXT,
+                pmf TEXT,
+                sae_frames INTEGER DEFAULT 0,
+                transition INTEGER DEFAULT 0,
+                downgrade_risk INTEGER DEFAULT 0,
+                proof TEXT,
+                UNIQUE(bssid)
+            )
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS wifi_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT,
+                severity TEXT,
+                bssid TEXT,
+                ssid TEXT,
+                client TEXT,
+                count INTEGER DEFAULT 0,
+                detail TEXT,
+                evidence TEXT,
+                UNIQUE(kind, bssid, ssid, client, detail)
+            )
+        """)
+
         # Create Quick Wins table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS quick_wins (

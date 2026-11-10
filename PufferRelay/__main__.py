@@ -191,7 +191,8 @@ def main():
         "(ldap,http,ftp,telnet,smtp,imap,pop3,ntlm,netbios,snmp,kerberos,"
         "kerberosdepth,kerberoast,ldapdir,httptokens,coercion,adcs,ipv6,dbcreds,"
         "smbobjects,sccm,llm,voip,rdp,cloudapi,fingerprints,ldapadcs,services,"
-        "dns,asrepcatcher,ips)",
+        "dns,asrepcatcher,ips,wifi,wifiwep,wifihs,wifiwps,wifieap,wifiwpa3,"
+        "wifievents)",
     )
     parser.add_argument(
         "--credentials-only",
@@ -234,7 +235,8 @@ def main():
         "(ldap,http,ftp,telnet,smtp,netbios,imap,pop3,snmp,kerberos,"
         "kerberosdepth,kerberoast,ldapdir,httptokens,coercion,adcs,ipv6,dbcreds,"
         "sccm,llm,voip,rdp,cloudapi,fingerprints,ldapadcs,services,dns,"
-        "asrepcatcher,ips)",
+        "asrepcatcher,ips,wifi,wifiwep,wifihs,wifiwps,wifieap,wifiwpa3,"
+        "wifievents)",
     )
     parser.add_argument(
         "--ip",
@@ -393,6 +395,21 @@ def main():
         "(text only; nothing is executed)",
     )
     parser.add_argument(
+        "--wifi-commands",
+        nargs="?",
+        const="",
+        metavar="FILE",
+        help="Write wifi-attacks.md: per-finding Wi-Fi commands (or article "
+        "links when no tool exists) derived from the passive capture "
+        "(text only; nothing is executed)",
+    )
+    parser.add_argument(
+        "--wifi-iface",
+        default="wlan0mon",
+        help="Wireless interface written into generated Wi-Fi commands "
+        "(text only, default wlan0mon)",
+    )
+    parser.add_argument(
         "--iface",
         default="eth0",
         help="Interface written into generated commands (text only, default eth0)",
@@ -429,6 +446,8 @@ def main():
     if args.ip or args.user or args.has_creds or args.table:
         args.read = True
     if args.report is not None and not (args.file or args.quick_wins or args.read):
+        args.read = True
+    if args.wifi_commands is not None and not (args.file or args.quick_wins or args.read):
         args.read = True
     if args.triage and not (args.file or args.quick_wins or args.read):
         args.read = True
@@ -529,13 +548,26 @@ def main():
             sys.exit(2)
         from PufferRelay.profile import select_profile
         from PufferRelay.protocols.services_handler import process_services
+        from PufferRelay.protocols import wifi as wifi_module
 
-        observed = process_services(args.file)
-        only = select_profile(observed)
-        if only:
-            logging.info("auto profile: %s", ",".join(only))
+        if wifi_module.has_wifi(args.file):
+            only = [
+                "wifi",
+                "wifiwep",
+                "wifihs",
+                "wifiwps",
+                "wifieap",
+                "wifiwpa3",
+                "wifievents",
+            ]
+            logging.info("auto profile: 802.11 capture -> Wi-Fi handlers")
         else:
-            logging.info("auto profile: capture too generic, running all handlers")
+            observed = process_services(args.file)
+            only = select_profile(observed)
+            if only:
+                logging.info("auto profile: %s", ",".join(only))
+            else:
+                logging.info("auto profile: capture too generic, running all handlers")
 
     conn = None
     try:
@@ -854,6 +886,37 @@ def main():
                                 ]
                             ),
                             title="Active commands",
+                            border_style="red",
+                        )
+                    )
+
+            if args.wifi_commands is not None:
+                from PufferRelay.protocols import wifi as wifi_module
+
+                out_dir = (args.dump if args.dump else "") or get_output_dir() or "out"
+                target = args.wifi_commands or os.path.join(
+                    out_dir, "wifi-attacks.md"
+                )
+                if target and not os.path.splitext(target)[1]:
+                    target = os.path.join(target, "wifi-attacks.md")
+                written = wifi_module.write_wifi_attacks(
+                    conn,
+                    target,
+                    interface=args.wifi_iface,
+                    pcap_name=os.path.basename(args.file) if args.file else "",
+                )
+                if machine:
+                    print(written, file=sys.stderr)
+                else:
+                    rprint(
+                        Panel(
+                            "[green]Wi-Fi attack pack written (text only):[/green]\n"
+                            f"  {written}\n\n"
+                            "[bold red]Commands marked ACTIVE send 802.11 "
+                            "frames when run.[/bold red]\n"
+                            "PufferRelay never runs them. Confirm scope and "
+                            "expect disruption from deauth/rogue AP tests.",
+                            title="Wi-Fi commands",
                             border_style="red",
                         )
                     )

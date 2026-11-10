@@ -329,6 +329,61 @@ def insert_into_database(protocol, data, db_path=None):
                 VALUES (?, ?, ?, ?)
             """, data)
             logging.debug(f"Inserted {cursor.rowcount} service records")
+        elif protocol == "wifi":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO wifi_networks
+                    (bssid, ssid, band, channel, security, akms, ciphers, pmf,
+                     first_seen, last_seen, beacons, clients)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} Wi-Fi networks")
+        elif protocol == "wifiwep":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO wifi_wep
+                    (bssid, ssid, channel, iv_count, unique_ivs, weak_ivs,
+                     arp_frames, clients, readiness, proof)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} WEP networks")
+        elif protocol == "wifihs":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO wifi_handshakes
+                    (bssid, ssid, client, messages, complete, pmkid, proof)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} Wi-Fi handshakes")
+        elif protocol == "wifiwps":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO wifi_wps
+                    (bssid, ssid, state, locked, selected_registrar,
+                     config_methods, manufacturer, model, device_name, version,
+                     risk)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} WPS access points")
+        elif protocol == "wifieap":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO wifi_eap
+                    (bssid, identity, methods, src, dst, frames, proof)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} EAP identities")
+        elif protocol == "wifiwpa3":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO wifi_wpa3
+                    (bssid, ssid, akms, pmf, sae_frames, transition,
+                     downgrade_risk, proof)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} WPA3 networks")
+        elif protocol == "wifievents":
+            cursor.executemany("""
+                INSERT OR IGNORE INTO wifi_events
+                    (kind, severity, bssid, ssid, client, count, detail,
+                     evidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, data)
+            logging.debug(f"Inserted {cursor.rowcount} Wi-Fi events")
 
         conn.commit()
     except sqlite3.Error as e:
@@ -448,6 +503,27 @@ PROTOCOL_TABLES = {
     "voip": ("voip_calls",
              ["kind", "severity", "src_ip", "dst_ip", "caller", "callee",
               "call_id", "detail"]),
+    "wifi": ("wifi_networks",
+             ["bssid", "ssid", "band", "channel", "security", "akms",
+              "ciphers", "pmf", "beacons", "clients"]),
+    "wifiwep": ("wifi_wep",
+                ["bssid", "ssid", "channel", "iv_count", "unique_ivs",
+                 "weak_ivs", "arp_frames", "readiness", "proof"]),
+    "wifihs": ("wifi_handshakes",
+               ["bssid", "ssid", "client", "messages", "complete", "pmkid",
+                "proof"]),
+    "wifiwps": ("wifi_wps",
+                ["bssid", "ssid", "state", "locked", "selected_registrar",
+                 "config_methods", "manufacturer", "model", "risk"]),
+    "wifieap": ("wifi_eap",
+                ["bssid", "identity", "methods", "src", "dst", "frames",
+                 "proof"]),
+    "wifiwpa3": ("wifi_wpa3",
+                 ["bssid", "ssid", "akms", "pmf", "sae_frames", "transition",
+                  "downgrade_risk", "proof"]),
+    "wifievents": ("wifi_events",
+                   ["kind", "severity", "bssid", "ssid", "client", "count",
+                    "detail"]),
 }
 
 

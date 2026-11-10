@@ -617,3 +617,108 @@
   next: "review each command and its scope warning"
   references: ""
   status: implemented
+
+- id: det.wifi
+  class: network
+  handler: wifi
+  mode: passive
+  when: "the capture is 802.11/radiotap (monitor mode)"
+  detects: "BSSID, SSID, band/channel, security suite, AKMs, ciphers, PMF, clients"
+  proves: "the security configuration advertised by beacons/probe responses"
+  limits: "a beacon is a capability claim, not proof of enforcement; hidden SSIDs are partial"
+  fields: "wlan.bssid, wlan.ssid, wlan.rsn.akms.type, wlan.rsn.capabilities.mfpc/mfpr"
+  output: "wifi-networks.tsv; leads WIFI-NET-*"
+  severity: low
+  next: "use the security label to pick the WEP/WPS/EAP/WPA3 handler"
+  references: "https://www.thehacker.recipes/radio/wi-fi/wpa2/"
+  status: implemented
+
+- id: det.wifiwep
+  class: weakness
+  handler: wifiwep
+  mode: passive
+  when: "WEP-protected data frames are present"
+  detects: "IV count, unique IVs, weak IVs, ARP frames, clients, crack readiness"
+  proves: "material for an offline WEP crack when enough unique IVs are captured"
+  limits: "readiness is a threshold estimate; only a crack proves the key"
+  fields: "wlan.wep.iv, wlan.wep.weakiv, wlan.fc.protected, arp.opcode"
+  output: "wifi-wep.tsv; leads WIFI-WEP-*"
+  severity: critical
+  next: "aircrack-ng offline; inject ARP replay only if more IVs are required"
+  references: "https://www.thehacker.recipes/radio/wi-fi/wep/"
+  status: implemented
+
+- id: det.wifihs
+  class: weakness
+  handler: wifihs
+  mode: passive
+  when: "EAPOL 4-way handshake frames or a PMKID are present"
+  detects: "M1-M4 pairing per BSSID/client, complete handshakes, PMKID values"
+  proves: "material that can be attacked offline with hashcat mode 22000"
+  limits: "a handshake is not a password; PMKID may need an association attempt"
+  fields: "eapol.keydes.*, wlan.rsn.ie.pmkid, wlan.rsn.pmkid.list"
+  output: "wifi-handshakes.tsv; pmkid-hashes.txt; leads WIFI-HANDSHAKE-*/WIFI-PMKID-*"
+  severity: high
+  next: "hcxpcapngtool + hashcat -m 22000 offline; deauth only if incomplete"
+  references: "https://www.thehacker.recipes/radio/wi-fi/wpa2/"
+  status: implemented
+
+- id: det.wifiwps
+  class: weakness
+  handler: wifiwps
+  mode: passive
+  when: "a beacon/probe response carries a WPS information element"
+  detects: "WPS state, lock, selected registrar, config methods, vendor/model"
+  proves: "WPS is advertised and whether it reports itself locked"
+  limits: "Pixie Dust applicability depends on the chipset; the PIN attack is active"
+  fields: "wps.wifi_protected_setup_state, wps.ap_setup_locked, wps.config_methods"
+  output: "wifi-wps.tsv; leads WIFI-WPS-*"
+  severity: high
+  next: "wash/reaver/bully only with monitor mode and a lockout plan"
+  references: "https://www.thehacker.recipes/radio/wi-fi/wps/"
+  status: implemented
+
+- id: det.wifieap
+  class: network
+  handler: wifieap
+  mode: passive
+  when: "EAP identity or EAP method frames are present"
+  detects: "identities and EAP methods (PEAP, TTLS, TLS, GTC, MSCHAPv2)"
+  proves: "the identities/methods exposed before the TLS tunnel"
+  limits: "no passwords; certificate validation cannot be proven passively"
+  fields: "eap.identity, eap.type, eap.code"
+  output: "wifi-eap.tsv; leads WIFI-EAP-*"
+  severity: medium
+  next: "rogue AP/relay (eaphammer, hostapd-mana) is active and scope-gated"
+  references: "https://www.synacktiv.com/publications/wireless-infidelity-pentest-wi-fi-en-2025.html"
+  status: implemented
+
+- id: det.wifiwpa3
+  class: weakness
+  handler: wifiwpa3
+  mode: passive
+  when: "RSN advertises SAE or a PSK+SAE transition mode"
+  detects: "SAE-only vs transition mode, PMF capable/required, SAE auth frames"
+  proves: "transition mode without required PMF is downgrade-exposed"
+  limits: "SAE has no offline hash; Dragonblood/SSID Confusion need active verification"
+  fields: "wlan.rsn.akms.type, wlan.rsn.capabilities.mfpc/mfpr, wlan.fixed.sae_message_type"
+  output: "wifi-wpa3.tsv; leads WIFI-WPA3-*"
+  severity: medium
+  next: "DragonShift for transition mode; references for SAE side channels"
+  references: "https://github.com/jabbaw0nky/DragonShift"
+  status: implemented
+
+- id: det.wifievents
+  class: network
+  handler: wifievents
+  mode: passive
+  when: "deauth/disassoc frames or duplicate SSIDs are present"
+  detects: "deauth/disassoc bursts and duplicate-SSID/security/OUI mismatches"
+  proves: "activity worth investigating; a duplicate SSID is a candidate only"
+  limits: "cannot prove an evil twin; benign duplicate APs exist"
+  fields: "wlan.fc.type_subtype, wlan.bssid, wlan.ssid, wlan.rsn.akms.type"
+  output: "wifi-events.tsv; leads WIFI-EVILTWIN-*/WIFI-DEAUTH-*"
+  severity: medium
+  next: "confirm with bettercap/mdk4 only after checking scope"
+  references: "https://www.synacktiv.com/publications/wireless-infidelity-pentest-wi-fi-en-2025.html"
+  status: implemented

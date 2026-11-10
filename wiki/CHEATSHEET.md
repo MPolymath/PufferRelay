@@ -56,6 +56,13 @@ pufferrelay -r --has-creds --json                   # ask the database
 | SSH, TLS, VNC or TFTP traffic is present | `fingerprints` | fingerprints.tsv; leads FP-* | banners are self-asserted; TLS certificates are not parsed; VNC no-auth is only what the server advertises; SMB3 encryption makes content opaque |
 | LDAP search results contain pKIEnrollmentService or pKICertificateTemplate objects | `ldapadcs` | ldap-adcs.tsv; leads ADCSDIR-* | attribute/value pairing is positional; template ACLs and effective rights are not visible |
 | -q is used, or -f is combined with -q | `quickwins` | quick_wins table; leads QW-* | presence is not exploitability; signing may be enforced elsewhere |
+| the capture is 802.11/radiotap (monitor mode) | `wifi` | wifi-networks.tsv; leads WIFI-NET-* | a beacon is a capability claim, not proof of enforcement; hidden SSIDs are partial |
+| WEP-protected data frames are present | `wifiwep` | wifi-wep.tsv; leads WIFI-WEP-* | readiness is a threshold estimate; only a crack proves the key |
+| EAPOL 4-way handshake frames or a PMKID are present | `wifihs` | wifi-handshakes.tsv; pmkid-hashes.txt; leads WIFI-HANDSHAKE-*/WIFI-PMKID-* | a handshake is not a password; PMKID may need an association attempt |
+| a beacon/probe response carries a WPS information element | `wifiwps` | wifi-wps.tsv; leads WIFI-WPS-* | Pixie Dust applicability depends on the chipset; the PIN attack is active |
+| EAP identity or EAP method frames are present | `wifieap` | wifi-eap.tsv; leads WIFI-EAP-* | no passwords; certificate validation cannot be proven passively |
+| RSN advertises SAE or a PSK+SAE transition mode | `wifiwpa3` | wifi-wpa3.tsv; leads WIFI-WPA3-* | SAE has no offline hash; Dragonblood/SSID Confusion need active verification |
+| deauth/disassoc frames or duplicate SSIDs are present | `wifievents` | wifi-events.tsv; leads WIFI-EVILTWIN-*/WIFI-DEAUTH-* | cannot prove an evil twin; benign duplicate APs exist |
 
 ## Active modes (opt-in, warned, authorized)
 

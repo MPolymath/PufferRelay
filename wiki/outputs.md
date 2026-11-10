@@ -26,6 +26,8 @@ pufferrelay -f capture.pcapng -q --dump out
 | `llm.tsv` | LLM/MCP/vector-DB endpoints and tool calls (metadata only) |
 | `kerberos-signals.tsv`, `ldap-spns.tsv`, `ldap-signing.tsv`, `ldap-adcs.tsv` | delegation/UnPAC, SPN→account/SID, signing, CA/template objects |
 | `voip.tsv`, `media.tsv`, `rdp.tsv`, `cloud-apis.tsv`, `fingerprints.tsv` | calls, carved media, RDP identity, infra APIs, SSH/TLS/VNC/TFTP |
+| `wifi-networks.tsv`, `wifi-wep.tsv`, `wifi-handshakes.tsv`, `pmkid-hashes.txt`, `wifi-wps.tsv`, `wifi-eap.tsv`, `wifi-wpa3.tsv`, `wifi-events.tsv` | 802.11 inventory, WEP readiness, handshake/PMKID (hashcat 22000), WPS, EAP identities, WPA3/PMF, rogue/deauth candidates |
+| `wifi-attacks.md` | text-only Wi-Fi command pack (`--wifi-commands`); ACTIVE lines marked, article links when no tool exists |
 | `credential-matrix.tsv`, `identity-graph.json` | identity reuse matrix and the normalized graph |
 | `report.md` / `report.html`, `diff.md`, `triage.md` | engagement report (Markdown or HTML), two-capture delta, optional localhost-LLM ranking |
 | `files.tsv` + `files/` | carved objects (client data — local only) |
@@ -37,10 +39,12 @@ pufferrelay -f capture.pcapng -q --dump out
 `CRED`, `HASH`, `ASREP`, `KERBEROAST`/`KERBEROASTCAND`, `TOKEN`, `RELAY`,
 `COERCE`, `ADCS`, `ADCSDIR`, `SCCM`, `IPV6`, `DB`, `LLM`, `KERB`, `SPN`,
 `LDAPSIGN`, `CHAIN`, `VOIP`, `RDP`, `CLOUD`, `FP`, `WPAD`, `REUSE`, `SMB`,
-`SMBFILE`, `FILE`, `NAC`, `WSUS`, `ASREPCATCHER`, `QW`.
+`SMBFILE`, `FILE`, `NAC`, `WSUS`, `ASREPCATCHER`, `WIFI`, `QW`.
 Each lead's `evidence` names the source file/row; the agent feed never needs
 to re-parse the database. Leads carry `confidence` (`high` for hash/secret
-evidence, `medium` for heuristics) and ATT&CK technique IDs.
+evidence, `medium` for heuristics) and ATT&CK technique IDs. Wi-Fi leads also
+carry `proof_level` (`observed`, `offline-crackable`,
+`active-verification-required`).
 
 ## Lead shape
 

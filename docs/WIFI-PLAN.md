@@ -1,7 +1,17 @@
 # Wi-Fi capability plan (802.11 / radiotap)
 
-Status: **planning only** (2026-11-10). No Wi-Fi code has been written yet.
-Tracking: epic #82, sub-issues #72–#81.
+Status: **implemented** (2026-11-10). Epic #82, sub-issues #72–#81.
+The passive handlers, tables, export files, leads and `--wifi-commands`
+generator are in `PufferRelay/protocols/wifi.py`; tests are in
+`PufferRelay/tests/test_wifi.py`. Implementation notes:
+
+- one union `tshark` pass (field occurrence `a`) feeds all seven handlers;
+- EAPOL message numbers use `wlan_rsna_eapol.keydes.msgnr` because Wireshark
+  4.4 no longer exposes the `eapol.keydes.key_info.*` display fields;
+- PMKID lines are emitted in hashcat 22000 form only when the PMKID, BSSID,
+  client and SSID are all present; otherwise the command pack points at
+  `hcxdumptool`/`hcxpcapngtool`;
+- `--wifi-commands` is text only and marks every ACTIVE line.
 
 ## 1. Goal
 

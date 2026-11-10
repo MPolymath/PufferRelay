@@ -44,6 +44,13 @@ TABLES = [
     "captured_files",
     "nac_events",
     "wsus_endpoints",
+    "wifi_networks",
+    "wifi_wep",
+    "wifi_handshakes",
+    "wifi_wps",
+    "wifi_eap",
+    "wifi_wpa3",
+    "wifi_events",
 ]
 
 # Tables that hold sensitive values; report only row counts, never samples.
