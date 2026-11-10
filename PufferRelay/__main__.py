@@ -101,10 +101,12 @@ def read_quick_wins_from_db(conn, show_ready_func=None):
         raise
 
 
-def run_exports(conn, out_dir, pcap_name=""):
+def run_exports(conn, out_dir, pcap_name="", pcap_path=""):
     """Write the export pack (files + agent lead briefing)."""
     try:
-        files = export.write_exports(conn, out_dir, pcap_name=pcap_name)
+        files = export.write_exports(
+            conn, out_dir, pcap_name=pcap_name, pcap_path=pcap_path
+        )
     except Exception as e:
         logging.error(f"Export failed: {str(e)}")
         raise
@@ -738,7 +740,15 @@ def main():
 
             if args.dump is not None:
                 dump_dir = args.dump or get_output_dir() or "out"
-                run_exports(conn, dump_dir, pcap_name=args.file or args.quick_wins or "")
+                capture_path = args.file or (
+                    args.quick_wins if isinstance(args.quick_wins, str) else ""
+                )
+                run_exports(
+                    conn,
+                    dump_dir,
+                    pcap_name=capture_path,
+                    pcap_path=capture_path,
+                )
 
             if args.report is not None:
                 from PufferRelay import report as report_module

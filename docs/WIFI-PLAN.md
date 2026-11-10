@@ -163,6 +163,9 @@ benefit from the inventory; output/report last once the data model is stable.
 - Synthetic scapy fixtures per attack class: radiotap/Dot11 beacons, probe
   responses, WEP data, EAPOL M1–M4, PMKID, WPS IEs, EAP identity/method, SAE
   and transition RSN, duplicate SSID/deauth bursts.
+  `scripts/make_wifi_fixture.py` generates the committed fixture (no capture
+  binary in git); `PufferRelay/tests/test_wifi_fixture.py` runs it through all
+  seven handlers when scapy and tshark are available.
 - Public captures (Wireshark samples) through `scripts/local_smoke.py` with
   aggregate counts only; never commit captures or hashes.
 - CI: tshark version matrix (existing); `build_wiki.py --check`; no active

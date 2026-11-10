@@ -18,6 +18,7 @@ import json
 import os
 import re
 import sqlite3
+import subprocess
 import time
 from collections import defaultdict
 from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -2655,6 +2656,7 @@ def write_exports(
     pcap_name: str = "",
     inventory: Optional[Dict] = None,
     leads: Optional[List[Dict]] = None,
+    pcap_path: str = "",
 ) -> List[str]:
     """Write the whole export pack. Returns the list of created files."""
     inventory = inventory or collect_inventory(conn)
@@ -3039,6 +3041,26 @@ def write_exports(
     wifi = inventory.get("wifi") or {}
     if any(wifi.values()):
         from PufferRelay.protocols import wifi as wifi_module
+
+        if pcap_path and os.path.exists(pcap_path) and wifi.get("handshakes"):
+            from PufferRelay.tshark_fields import find_tshark
+
+            tshark = find_tshark()
+            if tshark:
+                hs_dir = os.path.join(out_dir, "wifi-handshakes")
+                os.makedirs(hs_dir, exist_ok=True)
+                written.append(hs_dir)
+                subset = os.path.join(hs_dir, "handshake.pcap")
+                try:
+                    completed = subprocess.run(
+                        [tshark, "-r", pcap_path, "-Y", "eapol", "-w", subset],
+                        capture_output=True,
+                        timeout=300,
+                    )
+                    if completed.returncode == 0 and os.path.exists(subset):
+                        written.append(subset)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
 
         _write_text(
             path("wifi-networks.tsv"),
