@@ -1,3 +1,16 @@
+# PufferRelay 1.3.0 — 2026-11-22
+
+Copy-paste inventory modes and hash-mode correction.
+
+- `-r --print-ips [--private-only] [--join lines|comma|space]`: host IPs in a
+  form ready for `nmap -iL` or a single command argument.
+- `-r --print-subnets`: observed /24 subnets, one per line.
+- `-r --print-hashes [--hash-type all|ntlmv2|asrep|kerberoast]`: clean hashcat
+  lines, with human labels stripped from NTLMv2 captures.
+- AS-REP etype 17/18 now maps to hashcat mode 19900; etype 23 stays 18200.
+  `asrep-hashes.txt` includes both, and the lead command uses the correct mode.
+- Tests: 188 passing (5 new print-mode tests + etype-18 coverage).
+
 # PufferRelay 1.2.0 — 2026-11-10
 
 Passive Wi-Fi (802.11) coverage (epic #82, issues #72–#81). PufferRelay still

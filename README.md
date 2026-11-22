@@ -103,6 +103,19 @@ pufferrelay -r --ip 10.0.0.5 <br>
 pufferrelay -r --user alice --has-creds <br>
 pufferrelay -r --table dns_events --limit 100 <br>
 
+#### Copy-paste inventories (no files, stdout only)
+pufferrelay -r --print-ips                          # one IP per line, nmap -iL
+pufferrelay -r --print-ips --private-only           # RFC1918/private only
+pufferrelay -r --print-ips --join comma             # one comma-separated line
+pufferrelay -r --print-subnets                      # observed /24 subnets
+pufferrelay -r --print-hashes                       # clean hashcat lines
+pufferrelay -r --print-hashes --hash-type ntlmv2    # NetNTLMv2 only (-m 5600)
+pufferrelay -r --print-hashes --hash-type asrep     # AS-REP (18200/19900)
+pufferrelay -r --print-hashes --hash-type kerberoast
+pufferrelay -r --print-ips 2>$null                  # PowerShell: hide log line
+pufferrelay -r --print-ips 2>/dev/null              # bash: hide log line
+```
+
 #### Active modes (opt-in — these send packets)
 Every active mode prints a red warning and requires you to type `authorized`
 (or pass `--confirm-authorized` when you already have written scope).

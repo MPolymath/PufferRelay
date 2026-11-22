@@ -127,6 +127,30 @@ def run_exports(conn, out_dir, pcap_name="", pcap_path=""):
 
 def _print_machine_output(args, inventory, leads):
     """stdout only, for pipes and other tools."""
+    if args.print_ips:
+        text = export.format_values(
+            export.format_ip_list(inventory, private_only=args.private_only),
+            args.join,
+        )
+        if text:
+            print(text)
+        return
+    if args.print_subnets:
+        text = export.format_values(
+            export.format_subnet_list(inventory, private_only=args.private_only),
+            args.join,
+        )
+        if text:
+            print(text)
+        return
+    if args.print_hashes:
+        text = export.format_values(
+            export.format_hash_list(inventory, hash_type=args.hash_type),
+            args.join,
+        )
+        if text:
+            print(text)
+        return
     if args.json:
         print(
             json.dumps(
@@ -230,6 +254,45 @@ def main():
     )
     parser.add_argument(
         "--inventory", action="store_true", help="Print hosts/users only"
+    )
+    parser.add_argument(
+        "--print-ips",
+        "--ips",
+        dest="print_ips",
+        action="store_true",
+        help="Print captured host IPs, one per line (nmap -iL friendly)",
+    )
+    parser.add_argument(
+        "--print-subnets",
+        "--subnets",
+        dest="print_subnets",
+        action="store_true",
+        help="Print observed /24 subnets, one per line",
+    )
+    parser.add_argument(
+        "--print-hashes",
+        "--hashes",
+        dest="print_hashes",
+        action="store_true",
+        help="Print captured hashes, one per line, ready for hashcat",
+    )
+    parser.add_argument(
+        "--hash-type",
+        choices=["all", "ntlmv2", "asrep", "kerberoast"],
+        default="all",
+        help="With --print-hashes: filter the hash family (default: all)",
+    )
+    parser.add_argument(
+        "--join",
+        choices=["lines", "comma", "space"],
+        default="lines",
+        help="With --print-ips/--print-subnets/--print-hashes: output separator "
+        "(lines for nmap -iL; comma/space for a single argument list)",
+    )
+    parser.add_argument(
+        "--private-only",
+        action="store_true",
+        help="With --print-ips/--print-subnets: keep RFC1918/private addresses only",
     )
     parser.add_argument(
         "--protocol",
@@ -432,7 +495,16 @@ def main():
 
     setup_logger(getattr(logging, args.log_level or settings["log_level"]))
 
-    machine = bool(args.json or args.creds or args.inventory)
+    machine = bool(
+        args.json
+        or args.creds
+        or args.inventory
+        or args.print_ips
+        or args.print_subnets
+        or args.print_hashes
+    )
+    if sum(bool(x) for x in (args.print_ips, args.print_subnets, args.print_hashes)) > 1:
+        parser.error("choose only one of --print-ips, --print-subnets, --print-hashes")
 
     if args.detections:
         from PufferRelay.catalog import summarize

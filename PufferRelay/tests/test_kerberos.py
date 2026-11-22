@@ -77,6 +77,30 @@ def test_process_kerberos_returns_empty_without_kerberos():
         assert process_kerberos(pcap) == []
 
 
+def test_asrep_etype18_uses_hashcat_19900():
+    with tempfile.TemporaryDirectory() as tmp:
+        db_path = os.path.join(tmp, "data.db")
+        conn = create_database(db_path=db_path)
+        row = (
+            "bob",
+            "CORP.LOCAL",
+            "18",
+            asrep_hash("bob", "CORP.LOCAL", 18, PAYLOAD),
+            "10.0.0.5",
+            "10.0.0.10",
+        )
+        insert_into_database("kerberos", [row], db_path=db_path)
+        hashes = collect_hashes(conn)
+        assert hashes
+        assert hashes[0]["kind"] == "AS-REP (etype 18)"
+        assert hashes[0]["hashcat_mode"] == 19900
+        out = os.path.join(tmp, "out")
+        write_exports(conn, out, pcap_name="kerb18.pcap")
+        with open(os.path.join(out, "asrep-hashes.txt"), encoding="utf-8") as handle:
+            assert row[3] in handle.read()
+        conn.close()
+
+
 def test_kerberos_asrep_schema_exists():
     with tempfile.TemporaryDirectory() as tmp:
         db_path = os.path.join(tmp, "data.db")

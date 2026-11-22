@@ -112,6 +112,14 @@ pufferrelay -r --protocol ftp,ntlm                     # raw rows for those prot
 pufferrelay -r --ip 10.0.0.5                           # every row touching that IP
 pufferrelay -r --user alice --has-creds                # that identity's secrets
 pufferrelay -r --table dns_events --limit 100          # raw table dump
+pufferrelay -r --print-ips                             # one IP per line (nmap -iL)
+pufferrelay -r --print-ips --private-only              # private IPs only
+pufferrelay -r --print-ips --join comma                # one comma-separated line
+pufferrelay -r --print-subnets                         # observed /24 subnets
+pufferrelay -r --print-hashes                          # clean hashcat lines
+pufferrelay -r --print-hashes --hash-type ntlmv2       # NetNTLMv2 (5600)
+pufferrelay -r --print-hashes --hash-type asrep        # AS-REP (18200/19900)
+pufferrelay -r --print-hashes --hash-type kerberoast   # Kerberoast
 pufferrelay -f capture.pcap --report out/report.html  # HTML or .md
 pufferrelay -f capture.pcap --auto --dump out         # profile the services
 pufferrelay -f capture.pcap --auto --jobs 4 --dump out

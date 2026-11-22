@@ -14,6 +14,7 @@ Two audiences:
 from __future__ import annotations
 
 import csv
+import ipaddress
 import json
 import os
 import re
@@ -338,6 +339,16 @@ def collect_credentials(conn: sqlite3.Connection) -> List[Dict]:
     return creds
 
 
+def clean_hash(value: str) -> str:
+    """Strip human labels from a captured hash line."""
+    s = (value or "").strip()
+    marker = "ntlmv2 complete hash is:"
+    idx = s.lower().find(marker)
+    if idx >= 0:
+        s = s[idx + len(marker):].strip()
+    return s
+
+
 def collect_hashes(conn: sqlite3.Connection) -> List[Dict]:
     out = []
     if _has_table(conn, "kerberos_asrep"):
@@ -345,26 +356,33 @@ def collect_hashes(conn: sqlite3.Connection) -> List[Dict]:
             conn,
             "SELECT username, realm, etype, hash, src_ip, dst_ip FROM kerberos_asrep",
         ):
+            try:
+                etype_int = int(etype or 23)
+            except (TypeError, ValueError):
+                etype_int = 23
+            # etype 23 is RC4 (hashcat 18200); etype 17/18 is AES (19900).
+            mode = 18200 if etype_int == 23 else 19900
             out.append(
                 {
                     "username": f"{user}@{realm}",
                     "hash": asrep or "",
                     "source_ip": src or "",
                     "destination_ip": dst or "",
-                    "kind": f"AS-REP (etype {etype or '23'})",
-                    "hashcat_mode": 18200,
+                    "kind": f"AS-REP (etype {etype_int})",
+                    "hashcat_mode": mode,
                 }
             )
     for src, dst, user, ntlm_hash in _rows(
         conn, "SELECT source_ip, destination_ip, username, ntlm_hash FROM ntlm_requests"
     ):
+        cleaned = clean_hash(ntlm_hash or "")
         out.append(
             {
                 "username": user or "",
-                "hash": ntlm_hash or "",
+                "hash": cleaned,
                 "source_ip": src or "",
                 "destination_ip": dst or "",
-                "kind": "NTLMv2" if "$NETNTLMv2$" in (ntlm_hash or "") else "NTLM",
+                "kind": "NTLMv2" if "$NETNTLMv2$" in cleaned else "NTLM",
                 "hashcat_mode": 5600,
             }
         )
@@ -1424,7 +1442,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
         )
 
     # 3a. AS-REP roastable accounts: a domain credential for offline cracking.
-    asrep_hashes = [h for h in hashes if h.get("hashcat_mode") == 18200]
+    asrep_hashes = [h for h in hashes if h.get("hashcat_mode") in (18200, 19900)]
     for i, h in enumerate(asrep_hashes, start=1):
         add(
             {
@@ -1442,7 +1460,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
                 "suggested_actions": [
                     {
                         "intent": "Crack the AS-REP offline (no traffic to the target)",
-                        "command": "hashcat -m 18200 asrep-hashes.txt <wordlist> "
+                        "command": f"hashcat -m {h['hashcat_mode']} asrep-hashes.txt <wordlist> "
                         "-r rules/best64.rule",
                         "active": False,
                         "warning": "Offline only; safe for the target network.",
@@ -1988,7 +2006,7 @@ def build_leads(inventory: Dict) -> List[Dict]:
 
     # 3. NTLM hashes -> offline cracking (safe, no network).
     for i, h in enumerate(hashes, start=1):
-        if h.get("hashcat_mode") == 18200:
+        if h.get("hashcat_mode") in (18200, 19900):
             continue
         add(
             {
@@ -2554,6 +2572,76 @@ def format_nmap_command(hosts: Sequence[Dict]) -> str:
     return "nmap -sV -Pn " + " ".join(parts)
 
 
+def _is_private_ip(value: str) -> bool:
+    try:
+        return ipaddress.ip_address(value).is_private
+    except ValueError:
+        return False
+
+
+def format_ip_list(inventory: Dict, private_only: bool = False) -> List[str]:
+    """All host IPs, one per line, ready for ``nmap -iL``."""
+    ips = sorted(
+        {h["ip"] for h in inventory.get("hosts", []) if h.get("ip")},
+        key=_ip_key,
+    )
+    if private_only:
+        ips = [ip for ip in ips if _is_private_ip(ip)]
+    return ips
+
+
+def format_subnet_list(inventory: Dict, private_only: bool = False) -> List[str]:
+    """/24 subnets observed in the host inventory, one per line."""
+    subnets: Set[str] = set()
+    for host in inventory.get("hosts", []):
+        ip = host.get("ip")
+        if not ip:
+            continue
+        try:
+            net = ipaddress.ip_network(f"{ip}/24", strict=False)
+        except ValueError:
+            continue
+        if private_only and not net.is_private:
+            continue
+        subnets.add(str(net))
+    return sorted(subnets, key=lambda s: _ip_key(s.split("/")[0]))
+
+
+def format_hash_list(inventory: Dict, hash_type: str = "all") -> List[str]:
+    """Clean hash lines ready for hashcat; labels are stripped."""
+    kind = (hash_type or "all").lower()
+    out: List[str] = []
+    for item in inventory.get("hashes", []):
+        mode = item.get("hashcat_mode")
+        if kind == "ntlmv2" and mode != 5600:
+            continue
+        if kind == "asrep" and mode not in (18200, 19900):
+            continue
+        if kind == "kerberoast":
+            continue
+        value = clean_hash(item.get("hash", ""))
+        if value:
+            out.append(value)
+    if kind in ("all", "kerberoast"):
+        for item in inventory.get("kerberoast", []):
+            value = clean_hash(item.get("hash", ""))
+            if value:
+                out.append(value)
+    return sorted(set(out))
+
+
+def format_values(values: Sequence[str], join: str = "lines") -> str:
+    """Render a copy-paste list: newline (nmap -iL), comma or space."""
+    values = list(values)
+    if not values:
+        return ""
+    if join == "comma":
+        return ",".join(values)
+    if join == "space":
+        return " ".join(values)
+    return "\n".join(values)
+
+
 def leads_to_markdown(inventory: Dict, leads: Sequence[Dict], pcap_name: str = "") -> str:
     """Agent-facing briefing: ranked leads with evidence and next actions."""
     hosts = inventory.get("hosts", [])
@@ -2732,7 +2820,7 @@ def write_exports(
     )
     _write_text(
         path("asrep-hashes.txt"),
-        [h["hash"] for h in inventory["hashes"] if h["hash"] and h["hashcat_mode"] == 18200],
+        [h["hash"] for h in inventory["hashes"] if h["hash"] and h["hashcat_mode"] in (18200, 19900)],
     )
     relay_rows = inventory.get("relays", [])
     _write_text(
