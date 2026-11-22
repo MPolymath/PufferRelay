@@ -21,6 +21,8 @@ It focuses on parsing and analyzing network traffic to surface sensitive or acti
 
 ## 🚀 Getting Started
 
+📖 **GitBook:** [Getting started](https://mpolymath.gitbook.io/pufferrelay/getting-started) — install, first run, config, and the flags you will actually use.
+
 ### 🛠️ Install
 #### ⚗️PIPX
 sudo apt install tshark <br>
